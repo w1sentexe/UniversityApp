@@ -5,7 +5,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
-from starlette.datastructures import Headers, MutableHeaders
 
 from app.config import settings
 from app.db.session import dispose_engine, init_models, session_scope
@@ -87,4 +86,3 @@ app.include_router(schedule_router.router)
 Instrumentator(
     should_group_status_codes=False,
 ).instrument(app).expose(app)
-
