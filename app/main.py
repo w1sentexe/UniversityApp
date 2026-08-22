@@ -138,7 +138,7 @@ async def lifespan(app: FastAPI):
         log.info("Application stopped")
 
 
-app = FastAPI(title="VSUET Rating", lifespan=lifespan)
+app = FastAPI(title="VSUET Rating V2", lifespan=lifespan)
 # CORS для локального фронтенда (Vite/CRA/иные dev-серверы на localhost).
 app.add_middleware(
     CORSMiddleware,
