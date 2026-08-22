@@ -31,7 +31,7 @@ class SchedulerSettings(BaseSettings):
 
     model_config = {**_ENV, "env_prefix": "SCHEDULER_"}
 
-    interval_minutes: int = 30
+    interval_minutes: int = 10
 
 
 class RatingSiteSettings(BaseSettings):
