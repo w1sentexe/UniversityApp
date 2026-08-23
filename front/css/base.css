@@ -45,7 +45,7 @@ button { font-family: inherit; }
 
 /* ---------------------------------------------------------------
    Полосы прокрутки в блоках, которые скроллятся по горизонтали:
-   широкие таблицы рейтинга и лента дней в расписании.
+   широкие таблицы рейтинга.
 
    На десктопе полоса нужна — мышью иначе не видно, что блок листается.
    Системная выбивалась из оформления и рисовала непрозрачную дорожку поверх
@@ -59,24 +59,20 @@ button { font-family: inherit; }
    вторым правилом — проще задать вид по умолчанию и убрать его на узких экранах.
    --------------------------------------------------------------- */
 .table-scroll,
-.rt-scroll,
-.days {
+.rt-scroll {
   scrollbar-width: thin;                              /* Firefox */
   scrollbar-color: var(--line-2) transparent;
 }
 .table-scroll::-webkit-scrollbar,
-.rt-scroll::-webkit-scrollbar,
-.days::-webkit-scrollbar {
+.rt-scroll::-webkit-scrollbar {
   height: 8px;
 }
 .table-scroll::-webkit-scrollbar-track,
-.rt-scroll::-webkit-scrollbar-track,
-.days::-webkit-scrollbar-track {
+.rt-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 .table-scroll::-webkit-scrollbar-thumb,
-.rt-scroll::-webkit-scrollbar-thumb,
-.days::-webkit-scrollbar-thumb {
+.rt-scroll::-webkit-scrollbar-thumb {
   background: var(--line-2);
   border-radius: 999px;
   /* отступ от краёв, чтобы бегунок не упирался в скругления контейнера */

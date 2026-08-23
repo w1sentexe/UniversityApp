@@ -9,7 +9,6 @@
  */
 
 import { $ } from "./utils.js";
-import { renderSchedule } from "./view-schedule.js";
 import { renderSettings } from "./view-settings.js";
 
 const navItems = document.querySelectorAll(".nav__item[data-tab]");
@@ -28,10 +27,8 @@ export function switchTab(name) {
   });
   window.scrollTo(0, 0);
 
-  // Оба экрана рисуются заново при каждом открытии: они дёшевы, а данные
-  // (группа, расписание) могут доехать позже — так вкладка не залипнет
-  // на промежуточном состоянии.
-  if (name === "schedule") renderSchedule();
+  // Экран настроек рисуется заново при каждом открытии: он дешёвый, а данные
+  // профиля могут доехать позже — так вкладка не залипнет на промежуточном состоянии.
   if (name === "settings") renderSettings();
 }
 

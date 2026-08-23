@@ -43,7 +43,6 @@
   <link rel="stylesheet" href="css/app-shell.css?v=40" />
   <link rel="stylesheet" href="css/rating.css?v=40" />
   <link rel="stylesheet" href="css/kt-popup.css?v=40" />
-  <link rel="stylesheet" href="css/schedule.css?v=40" />
   <link rel="stylesheet" href="css/settings.css?v=40" />
 </head>
 <body ontouchstart="">
@@ -56,11 +55,6 @@
     <symbol id="ic-rating" viewBox="0 0 24 24">
       <g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3.5 20.5h17" /><path d="M6.5 20.5V12" /><path d="M12 20.5V4.5" /><path d="M17.5 20.5v-6" />
-      </g>
-    </symbol>
-    <symbol id="ic-schedule" viewBox="0 0 24 24">
-      <g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" /><path d="M3.5 9.5h17M8 3.2v3.6M16 3.2v3.6" />
       </g>
     </symbol>
     <symbol id="ic-settings" viewBox="0 0 24 24">
@@ -117,17 +111,13 @@
           <svg class="nav__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-rating" /></svg>
           <span class="nav__label">Рейтинг</span>
         </button>
-        <button class="nav__item" type="button" data-tab="schedule">
-          <svg class="nav__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-schedule" /></svg>
-          <span class="nav__label">Расписание</span>
-        </button>
         <button class="nav__item" type="button" data-tab="settings">
           <svg class="nav__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-settings" /></svg>
           <span class="nav__label">Настройки</span>
         </button>
       </div>
 
-      <!-- Выход: на десктопе внизу сайдбара, на мобилке — четвёртый пункт панели -->
+      <!-- Выход: на десктопе внизу сайдбара, на мобилке — отдельный пункт панели -->
       <button class="nav__item nav__item--logout" type="button" id="logout-btn" aria-label="Выйти из зачётки">
         <svg class="nav__icon" viewBox="0 0 15 15" aria-hidden="true"><use href="#ic-logout" /></svg>
         <span class="nav__label">Выход</span>
@@ -135,16 +125,11 @@
     </nav>
 
     <!-- Основная область. Шапки раздела нет: активный раздел называет
-         сама навигация, а группу показывает экран расписания. -->
+         сама навигация. -->
     <div class="app__main">
       <!-- Рейтинг -->
       <section class="tab" id="tab-rating" data-panel="rating" aria-label="Рейтинг">
         <main id="rating-content" class="content" aria-live="polite"></main>
-      </section>
-
-      <!-- Расписание -->
-      <section class="tab" id="tab-schedule" data-panel="schedule" aria-label="Расписание" hidden>
-        <div id="schedule-content" class="content"></div>
       </section>
 
       <!-- Настройки -->
