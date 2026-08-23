@@ -134,11 +134,45 @@ jobs:
             fi
 
             echo "==> Validating and reloading nginx"
-            docker compose -f docker-compose.prod.yml exec -T nginx nginx -t
-            docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload
+            for attempt in 1 2 3 4 5; do
+              if docker compose -f docker-compose.prod.yml exec -T nginx nginx -t; then
+                break
+              fi
+              if [ "$attempt" = "5" ]; then
+                exit 1
+              fi
+              sleep 2
+            done
+
+            for attempt in 1 2 3 4 5; do
+              if docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload; then
+                break
+              fi
+              if [ "$attempt" = "5" ]; then
+                exit 1
+              fi
+              sleep 2
+            done
 
             echo "==> Smoke checks"
-            curl -fsS https://universityapp.site/notifications/status >/dev/null
-            curl -fsSI https://universityapp.site/js/view-settings.js | grep -qi 'cache-control: no-cache'
+            for attempt in 1 2 3 4 5; do
+              if curl --retry 3 --retry-delay 2 --retry-all-errors -fsS https://universityapp.site/notifications/status >/dev/null; then
+                break
+              fi
+              if [ "$attempt" = "5" ]; then
+                exit 1
+              fi
+              sleep 2
+            done
+
+            for attempt in 1 2 3 4 5; do
+              if curl --retry 3 --retry-delay 2 --retry-all-errors -fsSI https://universityapp.site/js/view-settings.js | grep -qi 'cache-control: no-cache'; then
+                break
+              fi
+              if [ "$attempt" = "5" ]; then
+                exit 1
+              fi
+              sleep 2
+            done
 
             docker image prune -f
