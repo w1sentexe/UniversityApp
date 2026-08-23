@@ -55,3 +55,20 @@ class RatingMutationResponse(BaseModel):
     subject_name: str
     final_rating: str
     queued_notifications: int
+
+
+class ControlPointMutationRequest(BaseModel):
+    zach_number: str
+    ved_type: VedType
+    subject_name: str
+    kt_num: int = Field(..., ge=1, examples=[1])
+    total: str | int = Field(..., examples=[8])
+
+
+class ControlPointMutationResponse(BaseModel):
+    zach_number: str
+    ved_type: str
+    subject_name: str
+    kt_num: int
+    total: str
+    queued_notifications: int

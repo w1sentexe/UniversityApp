@@ -6,13 +6,15 @@ from fastapi import Depends
 from sqlalchemy import and_, distinct, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import NotificationOutbox, PushSubscription, RatingRecord, RatingWatchState, utcnow
+from app.db.models import GradeRecord, NotificationOutbox, PushSubscription, RatingRecord, RatingWatchState, utcnow
 from app.db.session import get_session
 from app.logging_config import get_logger
 
 log = get_logger(__name__)
 
 _DASH_VALUES = {"", "-", "—"}
+_CONTROL_POINT_VED_TYPES = {"Зачет", "Экзамен"}
+_STATE_PREFIXES = ("final:", "grade:", "kt:")
 
 
 def normalize_rating_value(value: str | int | None) -> str | None:
@@ -22,6 +24,33 @@ def normalize_rating_value(value: str | int | None) -> str | None:
     if normalized in _DASH_VALUES:
         return None
     return normalized
+
+
+def normalize_control_points(value: str | None) -> str:
+    if not value:
+        return "[]"
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        parsed = value
+    return json.dumps(parsed, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _state_value(prefix: str, value: str) -> str:
+    return f"{prefix}:{value}"
+
+
+def _is_legacy_state(value: str | None) -> bool:
+    return value is not None and not value.startswith(_STATE_PREFIXES)
+
+
+def _old_display_value(old_value: str | None) -> str | None:
+    if old_value is None:
+        return None
+    for prefix in _STATE_PREFIXES:
+        if old_value.startswith(prefix):
+            return old_value.removeprefix(prefix)
+    return old_value
 
 
 class NotificationRepository:
@@ -122,51 +151,51 @@ class NotificationRepository:
         if not zachs:
             return 0
 
-        current_rows = (
+        rating_rows = (
             await self._session.execute(select(RatingRecord).where(RatingRecord.zach_number.in_(zachs)))
         ).scalars()
-        current = list(current_rows)
+        grade_rows = (
+            await self._session.execute(select(GradeRecord).where(GradeRecord.zach_number.in_(zachs)))
+        ).scalars()
+        current = [*_notification_items_from_rating(rating_rows), *_notification_items_from_grades(grade_rows)]
         if not current:
             return 0
 
         states = await self._state_map(zachs)
-        initialized = {key[0] for key in states}
         state_rows: list[dict] = []
         changes_by_zach: dict[str, list[dict]] = defaultdict(list)
         now = utcnow()
 
-        for row in current:
-            new_value = normalize_rating_value(row.final_rating)
-            if new_value is None:
-                continue
-
-            key = (row.zach_number, row.ved_type, row.subject_name)
+        for item in current:
+            key = (item["zach_number"], item["ved_type"], item["subject_name"])
             old_value = states.get(key)
-            if old_value is None and row.zach_number in initialized:
-                changes_by_zach[row.zach_number].append(
+            new_value = item["state_value"]
+            should_notify = False
+
+            if old_value is not None:
+                if item["change_kind"] == "control_points" and _is_legacy_state(old_value):
+                    should_notify = False
+                elif old_value != new_value:
+                    should_notify = old_value != item["display_value"] if _is_legacy_state(old_value) else True
+
+            if should_notify:
+                old_display = None if item["change_kind"] == "control_points" else _old_display_value(old_value)
+                changes_by_zach[item["zach_number"]].append(
                     {
-                        "subject_name": row.subject_name,
-                        "ved_type": row.ved_type,
-                        "old_value": None,
-                        "new_value": new_value,
-                    }
-                )
-            elif old_value is not None and old_value != new_value:
-                changes_by_zach[row.zach_number].append(
-                    {
-                        "subject_name": row.subject_name,
-                        "ved_type": row.ved_type,
-                        "old_value": old_value,
-                        "new_value": new_value,
+                        "subject_name": item["subject_name"],
+                        "ved_type": item["ved_type"],
+                        "change_kind": item["change_kind"],
+                        "old_value": old_display,
+                        "new_value": item["display_value"],
                     }
                 )
 
             if old_value != new_value:
                 state_rows.append(
                     {
-                        "zach_number": row.zach_number,
-                        "ved_type": row.ved_type,
-                        "subject_name": row.subject_name,
+                        "zach_number": item["zach_number"],
+                        "ved_type": item["ved_type"],
+                        "subject_name": item["subject_name"],
                         "last_value": new_value,
                         "updated_at": now,
                     }
@@ -260,32 +289,89 @@ class NotificationRepository:
         return {(row.zach_number, row.ved_type, row.subject_name): row.last_value for row in rows}
 
     async def _seed_watch_state(self, zach_number: str) -> None:
-        rows = (
+        rating_rows = (
             await self._session.execute(select(RatingRecord).where(RatingRecord.zach_number == zach_number))
+        ).scalars()
+        grade_rows = (
+            await self._session.execute(select(GradeRecord).where(GradeRecord.zach_number == zach_number))
         ).scalars()
         now = utcnow()
         state_rows = [
             {
-                "zach_number": row.zach_number,
-                "ved_type": row.ved_type,
-                "subject_name": row.subject_name,
-                "last_value": value,
+                "zach_number": item["zach_number"],
+                "ved_type": item["ved_type"],
+                "subject_name": item["subject_name"],
+                "last_value": item["state_value"],
                 "updated_at": now,
             }
-            for row in rows
-            if (value := normalize_rating_value(row.final_rating)) is not None
+            for item in [*_notification_items_from_rating(rating_rows), *_notification_items_from_grades(grade_rows)]
         ]
         if state_rows:
             await self._session.execute(insert(RatingWatchState).prefix_with("OR IGNORE"), state_rows)
+
+
+def _notification_items_from_rating(rows) -> list[dict[str, str]]:
+    items = []
+    for row in rows:
+        if row.ved_type in _CONTROL_POINT_VED_TYPES:
+            value = normalize_control_points(row.control_points)
+            items.append(
+                {
+                    "zach_number": row.zach_number,
+                    "ved_type": row.ved_type,
+                    "subject_name": row.subject_name,
+                    "change_kind": "control_points",
+                    "state_value": _state_value("kt", value),
+                    "display_value": "обновлены контрольные точки",
+                }
+            )
+            continue
+
+        value = normalize_rating_value(row.final_rating)
+        if value is None:
+            continue
+        items.append(
+            {
+                "zach_number": row.zach_number,
+                "ved_type": row.ved_type,
+                "subject_name": row.subject_name,
+                "change_kind": "final_rating",
+                "state_value": _state_value("final", value),
+                "display_value": value,
+            }
+        )
+    return items
+
+
+def _notification_items_from_grades(rows) -> list[dict[str, str]]:
+    items = []
+    for row in rows:
+        value = normalize_rating_value(row.grade)
+        if value is None:
+            continue
+        items.append(
+            {
+                "zach_number": row.zach_number,
+                "ved_type": row.ved_type,
+                "subject_name": row.subject_name,
+                "change_kind": "grade",
+                "state_value": _state_value("grade", value),
+                "display_value": value,
+            }
+        )
+    return items
 
 
 def _payload(zach_number: str, changes: list[dict]) -> dict:
     first = changes[0]
     title = "Выставлен новый рейтинг"
     if len(changes) == 1:
-        old_value = first["old_value"]
-        value_text = f"{old_value} → {first['new_value']}" if old_value is not None else str(first["new_value"])
-        body = f"{first['subject_name']}: {value_text}"
+        if first.get("change_kind") == "control_points":
+            body = f"{first['subject_name']}: обновлены контрольные точки"
+        else:
+            old_value = first["old_value"]
+            value_text = f"{old_value} → {first['new_value']}" if old_value is not None else str(first["new_value"])
+            body = f"{first['subject_name']}: {value_text}"
     else:
         body = f"Обновлены дисциплины: {len(changes)}"
 

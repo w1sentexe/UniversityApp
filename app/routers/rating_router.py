@@ -5,7 +5,12 @@ from app.config import settings
 from app.db.session import get_session, session_scope
 from app.entities.enums import VedType
 from app.entities.not_rating_ved_model import NotRatingVedModel
-from app.entities.notification_models import RatingMutationRequest, RatingMutationResponse
+from app.entities.notification_models import (
+    ControlPointMutationRequest,
+    ControlPointMutationResponse,
+    RatingMutationRequest,
+    RatingMutationResponse,
+)
 from app.entities.rating_ved_model import RatingVedModel
 from app.repository.notification_repository import NotificationRepository
 from app.services.notification_service import NotificationService
@@ -102,6 +107,23 @@ async def update_final_rating_for_test(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid test token")
 
     response = await RatingMutationService(session).update_final_rating(request)
+    async with session_scope() as dispatch_session:
+        await NotificationService(NotificationRepository(dispatch_session)).dispatch_pending()
+    return response
+
+
+@router.patch("/test/control-point-total")
+async def update_control_point_total_for_test(
+    request: ControlPointMutationRequest,
+    x_test_token: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> ControlPointMutationResponse:
+    if not settings.test.mutation_token:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test mutation endpoint is disabled")
+    if x_test_token != settings.test.mutation_token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid test token")
+
+    response = await RatingMutationService(session).update_control_point_total(request)
     async with session_scope() as dispatch_session:
         await NotificationService(NotificationRepository(dispatch_session)).dispatch_pending()
     return response
