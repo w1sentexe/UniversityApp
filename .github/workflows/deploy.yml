@@ -34,7 +34,9 @@ jobs:
       packages: write
     outputs:
       backend_changed: ${{ steps.filter.outputs.backend }}
+      frontend_changed: ${{ steps.filter.outputs.frontend }}
       nginx_changed: ${{ steps.filter.outputs.nginx }}
+      compose_changed: ${{ steps.filter.outputs.compose }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,8 +54,12 @@ jobs:
               - 'Dockerfile'
               - 'pyproject.toml'
               - 'uv.lock'
+            frontend:
+              - 'front/**'
             nginx:
               - 'nginx/**'
+            compose:
+              - 'docker-compose.prod.yml'
 
       - name: Log in to GHCR
         if: steps.filter.outputs.backend == 'true'
@@ -120,14 +126,16 @@ jobs:
               echo "==> Backend unchanged, skipping app restart"
             fi
 
-            if [ "${{ needs.build_and_push.outputs.nginx_changed }}" = "true" ]; then
-              echo "==> nginx config changed, recreating container"
+            if [ "${{ needs.build_and_push.outputs.nginx_changed }}" = "true" ] || [ "${{ needs.build_and_push.outputs.frontend_changed }}" = "true" ] || [ "${{ needs.build_and_push.outputs.compose_changed }}" = "true" ]; then
+              echo "==> Web serving changed, recreating nginx container"
               docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps nginx
+              docker compose -f docker-compose.prod.yml exec -T nginx nginx -t
             else
-              echo "==> nginx config unchanged, skipping restart"
+              echo "==> Web serving unchanged, skipping nginx restart"
             fi
 
-            # front/ обновляется просто через git reset выше — не требует
-            # ни пересборки, ни reload (volume читается заново на каждый запрос)
+            echo "==> Smoke checks"
+            curl -fsS https://universityapp.site/notifications/status >/dev/null
+            curl -fsSI https://universityapp.site/js/view-settings.js | grep -qi 'cache-control: no-cache'
 
             docker image prune -f
