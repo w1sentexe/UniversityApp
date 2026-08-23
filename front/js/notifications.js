@@ -65,10 +65,10 @@ export async function notificationState() {
 }
 
 export async function enableNotifications(zach) {
-  if (!supported()) throw new Error("Push is not supported");
+  if (!supported()) throw new Error("Уведомления недоступны");
 
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") throw new Error("Notification permission denied");
+  if (permission !== "granted") throw new Error("Запрещены");
 
   const { public_key: publicKey } = await apiGet("/notifications/vapid-public-key");
   const registration = await serviceWorkerRegistration();

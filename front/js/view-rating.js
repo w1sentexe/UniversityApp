@@ -9,11 +9,6 @@
 import { DASH, VED_TYPES } from "./config.js";
 import { apiGet } from "./api.js";
 import {
-  enableNotifications,
-  notificationState,
-  syncExistingNotificationSubscription,
-} from "./notifications.js";
-import {
   $,
   disciplines,
   escapeHtml,
@@ -68,7 +63,7 @@ export async function loadRating(zach) {
     return;
   }
 
-  let html = '<div id="rating-push-prompt" class="push-prompt" hidden></div>';
+  let html = "";
   if (failed > 0) {
     html += `
       <div class="banner" role="status">
@@ -81,43 +76,6 @@ export async function loadRating(zach) {
 
   const bannerRetry = $("#banner-retry");
   if (bannerRetry) bannerRetry.addEventListener("click", () => loadRating(zach));
-  syncRatingNotificationPrompt(zach);
-}
-
-async function syncRatingNotificationPrompt(zach) {
-  const prompt = $("#rating-push-prompt");
-  if (!prompt) return;
-
-  try {
-    const state = await notificationState();
-    if (!state.supported || state.permission === "denied") return;
-
-    if (state.enabled) {
-      await syncExistingNotificationSubscription(zach);
-      return;
-    }
-
-    prompt.hidden = false;
-    prompt.innerHTML = `
-      <span>Получать уведомления, когда меняется рейтинг.</span>
-      <button class="btn btn--ghost push-prompt__btn" type="button">Включить</button>`;
-
-    const button = $(".push-prompt__btn", prompt);
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      button.textContent = "Включаем…";
-      try {
-        await enableNotifications(zach);
-        prompt.hidden = true;
-      } catch (err) {
-        button.disabled = false;
-        button.textContent = err instanceof Error ? err.message : "Ошибка";
-      }
-    });
-  } catch (err) {
-    prompt.hidden = false;
-    prompt.innerHTML = `<span>${escapeHtml(err instanceof Error ? err.message : "Уведомления недоступны")}</span>`;
-  }
 }
 
 function renderSection(section, index) {

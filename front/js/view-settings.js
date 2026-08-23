@@ -60,7 +60,13 @@ export function renderSettings() {
         <p class="set-card__label">Уведомления</p>
         <div class="set-row set-row--control">
           <span class="set-row__k">Новый рейтинг</span>
-          <button class="btn btn--ghost set-action" type="button" data-push-toggle disabled>Проверяем…</button>
+          <label class="switch">
+            <input class="switch__input" type="checkbox" role="switch" data-push-toggle disabled />
+            <span class="switch__track" aria-hidden="true">
+              <span class="switch__thumb"></span>
+            </span>
+            <span class="switch__text" data-push-status>Проверяем…</span>
+          </label>
         </div>
       </div>
     </div>`;
@@ -76,38 +82,37 @@ export function renderSettings() {
 }
 
 async function syncNotificationControl() {
-  const button = document.querySelector("[data-push-toggle]");
-  if (!button) return;
+  const toggle = document.querySelector("[data-push-toggle]");
+  const status = document.querySelector("[data-push-status]");
+  if (!toggle || !status) return;
 
   try {
     const state = await notificationState();
     const zach = getZach();
     if (state.enabled && zach) await syncExistingNotificationSubscription(zach);
 
-    button.disabled = !state.supported || state.permission === "denied";
-    button.dataset.enabled = state.enabled ? "true" : "false";
-    button.textContent = state.enabled ? "Выключить" : state.label;
-    if (state.supported && !state.enabled && state.permission !== "denied") {
-      button.textContent = "Включить";
-    }
+    toggle.disabled = !state.supported || state.permission === "denied" || !zach;
+    toggle.checked = state.enabled;
+    status.textContent = state.permission === "denied" ? "Запрещены" : state.enabled ? "Включены" : "Выключены";
   } catch (err) {
-    button.disabled = true;
-    button.textContent = err instanceof Error ? err.message : "Недоступно";
+    toggle.disabled = true;
+    status.textContent = err instanceof Error ? err.message : "Недоступно";
   }
 
-  button.addEventListener("click", async () => {
+  toggle.addEventListener("change", async () => {
     const zach = getZach();
     if (!zach) return;
-    button.disabled = true;
-    const enabled = button.dataset.enabled === "true";
-    button.textContent = enabled ? "Выключаем…" : "Включаем…";
+    const enabled = toggle.checked;
+    toggle.disabled = true;
+    status.textContent = enabled ? "Включаем…" : "Выключаем…";
     try {
-      if (enabled) await disableNotifications();
-      else await enableNotifications(zach);
+      if (enabled) await enableNotifications(zach);
+      else await disableNotifications();
       renderSettings();
     } catch (err) {
-      button.disabled = false;
-      button.textContent = err instanceof Error ? err.message : "Ошибка";
+      toggle.checked = !enabled;
+      toggle.disabled = false;
+      status.textContent = err instanceof Error ? err.message : "Ошибка";
     }
   });
 }
