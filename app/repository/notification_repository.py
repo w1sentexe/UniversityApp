@@ -365,7 +365,7 @@ def _notification_items_from_grades(rows) -> list[dict[str, str]]:
 
 def _payload(zach_number: str, changes: list[dict]) -> dict:
     first = changes[0]
-    title = "Уведомление от UniversityApp"
+    title = "Уведомление"
     if len(changes) == 1:
         body = f"Выставлен новый рейтинг по дисциплине: {first['subject_name']}"
     else:
