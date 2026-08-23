@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.config import settings
 from app.db.session import session_scope
@@ -10,6 +10,7 @@ from app.repository.snapshot_repository import SnapshotRepository
 from app.services.notification_service import NotificationService
 from app.services.parser_service import ParserService
 from app.services.parsing_pipeline import ParsingPipeline, PipelineError
+from app.time_utils import local_now
 
 log = get_logger(__name__)
 
@@ -42,7 +43,7 @@ async def run_parsing_cycle() -> None:
                 return
 
         if not report.site_available:
-            next_run = (datetime.now() + timedelta(minutes=settings.scheduler.interval_minutes)).strftime(
+            next_run = (local_now() + timedelta(minutes=settings.scheduler.interval_minutes)).strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
             log.warning("Parsing cycle postponed", url=settings.site.base_url, next_run=next_run)

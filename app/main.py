@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
@@ -12,6 +12,7 @@ from app.logging_config import get_logger, print_banner, setup_logging
 from app.repository.rating_repository import RatingRepository
 from app.routers import notifications_router, rating_router, schedule_router, students_router
 from app.scheduler.jobs import dispatch_pending_notifications, run_parsing_cycle
+from app.time_utils import APP_TIMEZONE, local_now
 
 print_banner()
 setup_logging()
@@ -40,16 +41,20 @@ async def lifespan(app: FastAPI):
     # Если снапшота ещё нет — первый запуск парсинга сразу после старта
     # (с небольшой задержкой, чтобы не влезть в стартовые логи uvicorn).
     empty = all(n == 0 for n in counts.values())
-    first_run = datetime.now() + timedelta(seconds=_FIRST_RUN_DELAY_S) if empty else None
+    first_run_delay = (
+        timedelta(seconds=_FIRST_RUN_DELAY_S) if empty else timedelta(minutes=settings.scheduler.interval_minutes)
+    )
+    first_run = local_now() + first_run_delay
     if empty:
         log.info("Database is empty — parsing cycle will run shortly after startup", delay_s=_FIRST_RUN_DELAY_S)
     else:
         log.info(
             "Database already contains data — immediate parsing cycle skipped",
             next_run_in_min=settings.scheduler.interval_minutes,
+            next_run_at=first_run.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
-    scheduler = AsyncIOScheduler()
+    scheduler = AsyncIOScheduler(timezone=APP_TIMEZONE)
     scheduler.add_job(
         run_parsing_cycle,
         trigger="interval",

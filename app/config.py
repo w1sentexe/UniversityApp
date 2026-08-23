@@ -129,6 +129,7 @@ class LoggingSettings(BaseSettings):
     model_config = {**_ENV, "env_prefix": "LOG_"}
 
     level: str = "INFO"
+    timezone: str = "Europe/Moscow"
 
     reset: str = "\033[0m"
     time_color: str = "\033[94m"
