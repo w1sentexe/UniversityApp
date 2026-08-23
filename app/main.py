@@ -38,21 +38,16 @@ async def lifespan(app: FastAPI):
         counts = await RatingRepository(session).counts()
     log.info("Snapshot on start", **counts)
 
-    # Если снапшота ещё нет — первый запуск парсинга сразу после старта
-    # (с небольшой задержкой, чтобы не влезть в стартовые логи uvicorn).
-    empty = all(n == 0 for n in counts.values())
-    first_run_delay = (
-        timedelta(seconds=_FIRST_RUN_DELAY_S) if empty else timedelta(minutes=settings.scheduler.interval_minutes)
-    )
+    # Первый запуск парсинга всегда сразу после старта: даже существующий снапшот
+    # нужно обновить после деплоя/рестарта, а затем продолжать по интервалу.
+    first_run_delay = timedelta(seconds=_FIRST_RUN_DELAY_S)
     first_run = local_now() + first_run_delay
-    if empty:
-        log.info("Database is empty — parsing cycle will run shortly after startup", delay_s=_FIRST_RUN_DELAY_S)
-    else:
-        log.info(
-            "Database already contains data — immediate parsing cycle skipped",
-            next_run_in_min=settings.scheduler.interval_minutes,
-            next_run_at=first_run.strftime("%Y-%m-%d %H:%M:%S"),
-        )
+    log.info(
+        "Parsing cycle will run shortly after startup",
+        delay_s=_FIRST_RUN_DELAY_S,
+        interval_min=settings.scheduler.interval_minutes,
+        first_run_at=first_run.strftime("%Y-%m-%d %H:%M:%S"),
+    )
 
     scheduler = AsyncIOScheduler(timezone=APP_TIMEZONE)
     scheduler.add_job(
