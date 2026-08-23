@@ -79,6 +79,21 @@ export async function enableNotifications(zach) {
   storeEndpoint(subscription.endpoint);
 }
 
+export async function syncExistingNotificationSubscription(zach) {
+  if (!supported() || Notification.permission !== "granted") return false;
+
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return false;
+
+  await apiPost("/notifications/subscribe", {
+    zach_number: zach,
+    subscription: subscription.toJSON(),
+  });
+  storeEndpoint(subscription.endpoint);
+  return true;
+}
+
 export async function disableNotifications() {
   if (!supported()) return;
 

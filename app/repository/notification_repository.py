@@ -3,7 +3,7 @@ from collections import defaultdict
 from uuid import uuid4
 
 from fastapi import Depends
-from sqlalchemy import and_, distinct, insert, or_, select
+from sqlalchemy import and_, distinct, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import NotificationOutbox, PushSubscription, RatingRecord, RatingWatchState, utcnow
@@ -75,6 +75,41 @@ class NotificationRepository:
         await self._session.commit()
         log.info("Push subscription disabled", subscription_id=subscription.id)
         return True
+
+    async def debug_state(self, zach_number: str) -> dict[str, int | str]:
+        enabled_subscriptions = await self._session.scalar(
+            select(func.count())
+            .select_from(PushSubscription)
+            .where(PushSubscription.zach_number == zach_number, PushSubscription.enabled.is_(True))
+        )
+        disabled_subscriptions = await self._session.scalar(
+            select(func.count())
+            .select_from(PushSubscription)
+            .where(PushSubscription.zach_number == zach_number, PushSubscription.enabled.is_(False))
+        )
+        watch_states = await self._session.scalar(
+            select(func.count()).select_from(RatingWatchState).where(RatingWatchState.zach_number == zach_number)
+        )
+        outbox_counts = {
+            status: int(total)
+            for status, total in (
+                await self._session.execute(
+                    select(NotificationOutbox.status, func.count())
+                    .join(PushSubscription, NotificationOutbox.subscription_id == PushSubscription.id)
+                    .where(PushSubscription.zach_number == zach_number)
+                    .group_by(NotificationOutbox.status)
+                )
+            ).all()
+        }
+        return {
+            "zach_number": zach_number,
+            "enabled_subscriptions": int(enabled_subscriptions or 0),
+            "disabled_subscriptions": int(disabled_subscriptions or 0),
+            "watch_states": int(watch_states or 0),
+            "pending_outbox": outbox_counts.get("pending", 0),
+            "sent_outbox": outbox_counts.get("sent", 0),
+            "failed_outbox": outbox_counts.get("failed", 0),
+        }
 
     async def enqueue_current_rating_changes(
         self,

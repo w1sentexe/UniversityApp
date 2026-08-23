@@ -6,7 +6,12 @@
  */
 
 import { $, escapeHtml } from "./utils.js";
-import { disableNotifications, enableNotifications, notificationState } from "./notifications.js";
+import {
+  disableNotifications,
+  enableNotifications,
+  notificationState,
+  syncExistingNotificationSubscription,
+} from "./notifications.js";
 import { getGroup, getZach } from "./store.js";
 import { applyTheme, currentTheme } from "./theme.js";
 
@@ -76,6 +81,9 @@ async function syncNotificationControl() {
 
   try {
     const state = await notificationState();
+    const zach = getZach();
+    if (state.enabled && zach) await syncExistingNotificationSubscription(zach);
+
     button.disabled = !state.supported || state.permission === "denied";
     button.dataset.enabled = state.enabled ? "true" : "false";
     button.textContent = state.enabled ? "Выключить" : state.label;

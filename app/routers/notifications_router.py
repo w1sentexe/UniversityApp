@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.config import settings
 from app.entities.notification_models import (
+    NotificationDebugModel,
     NotificationStatusModel,
     SubscribeRequest,
     UnsubscribeRequest,
@@ -29,6 +30,19 @@ async def notification_status() -> NotificationStatusModel:
         enabled=configured,
         reason=None if configured else "Web Push is not configured",
     )
+
+
+@router.get("/test/debug/{zach_number}")
+async def debug_notifications(
+    zach_number: str,
+    x_test_token: str | None = Header(default=None),
+    repo: NotificationRepository = Depends(get_notification_repository),
+) -> NotificationDebugModel:
+    if not settings.test.mutation_token:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test endpoint is disabled")
+    if x_test_token != settings.test.mutation_token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid test token")
+    return NotificationDebugModel(**await repo.debug_state(zach_number))
 
 
 @router.post("/subscribe", status_code=status.HTTP_204_NO_CONTENT)

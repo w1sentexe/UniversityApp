@@ -28,6 +28,16 @@ class NotificationStatusModel(BaseModel):
     reason: str | None = None
 
 
+class NotificationDebugModel(BaseModel):
+    zach_number: str
+    enabled_subscriptions: int
+    disabled_subscriptions: int
+    watch_states: int
+    pending_outbox: int
+    sent_outbox: int
+    failed_outbox: int
+
+
 class VapidPublicKeyModel(BaseModel):
     public_key: str
 
