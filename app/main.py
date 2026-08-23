@@ -10,8 +10,8 @@ from app.config import settings
 from app.db.session import dispose_engine, init_models, session_scope
 from app.logging_config import get_logger, print_banner, setup_logging
 from app.repository.rating_repository import RatingRepository
-from app.routers import rating_router, schedule_router, students_router
-from app.scheduler.jobs import run_parsing_cycle
+from app.routers import notifications_router, rating_router, schedule_router, students_router
+from app.scheduler.jobs import dispatch_pending_notifications, run_parsing_cycle
 
 print_banner()
 setup_logging()
@@ -59,6 +59,14 @@ async def lifespan(app: FastAPI):
         coalesce=True,
         next_run_time=first_run,
     )
+    scheduler.add_job(
+        dispatch_pending_notifications,
+        trigger="interval",
+        seconds=settings.notifications.dispatch_interval_seconds,
+        id="push_dispatch",
+        max_instances=1,
+        coalesce=True,
+    )
     scheduler.start()
     app.state.scheduler = scheduler
     log.info("Scheduler started", interval_min=settings.scheduler.interval_minutes)
@@ -81,6 +89,7 @@ app.add_middleware(
 )
 app.include_router(students_router.router)
 app.include_router(rating_router.router)
+app.include_router(notifications_router.router)
 
 app.include_router(schedule_router.router)
 Instrumentator(

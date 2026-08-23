@@ -1,4 +1,4 @@
-const CACHE_NAME = "vsuet-rating-v50";
+const CACHE_NAME = "vsuet-rating-v51";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   "./js/config.js",
   "./js/utils.js",
   "./js/api.js",
+  "./js/notifications.js",
   "./js/store.js",
   "./js/theme.js",
   "./js/login.js",
@@ -144,4 +145,45 @@ self.addEventListener("fetch", (e) => {
   const isStatic = STATIC_EXTENSIONS.test(e.request.url);
 
   e.respondWith(isStatic ? cacheFirst(e.request) : onlineFirst(e.request));
+});
+
+self.addEventListener("push", (e) => {
+  let data = {};
+  try {
+    data = e.data ? e.data.json() : {};
+  } catch (_) {
+    data = { title: "Выставлен новый рейтинг", body: e.data ? e.data.text() : "" };
+  }
+
+  const title = data.title || "Выставлен новый рейтинг";
+  const options = {
+    body: data.body || "Откройте приложение, чтобы посмотреть изменения.",
+    icon: "./resources/logo-192.png",
+    badge: "./resources/logo-192.png",
+    tag: data.tag || "rating-update",
+    renotify: true,
+    data: {
+      url: data.url || "/",
+      zach_number: data.zach_number || null,
+    },
+  };
+
+  e.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const targetUrl = new URL(e.notification.data?.url || "/", self.location.origin).href;
+
+  e.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          client.focus();
+          return;
+        }
+      }
+      return clients.openWindow(targetUrl);
+    })
+  );
 });

@@ -44,6 +44,27 @@ class SchedulerSettings(BaseSettings):
     interval_minutes: int = 10
 
 
+class NotificationSettings(BaseSettings):
+    """Web Push: VAPID-ключи и параметры отправки уведомлений."""
+
+    model_config = {**_ENV, "env_prefix": "NOTIFICATIONS_"}
+
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    vapid_subject: str = "mailto:admin@example.com"
+    dispatch_interval_seconds: int = 60
+    ttl_seconds: int = 86400
+    max_attempts: int = 5
+
+
+class TestSettings(BaseSettings):
+    """Ручные тестовые эндпоинты, требующие токен в X-Test-Token."""
+
+    model_config = {**_ENV, "env_prefix": "TEST_"}
+
+    mutation_token: str | None = None
+
+
 class RatingSiteSettings(BaseSettings):
     """URL-ы и кодировка сайта рейтинга ВГУИТ."""
 
@@ -135,6 +156,8 @@ class Settings(BaseModel):
     parsing: ParsingSettings = Field(default_factory=ParsingSettings)
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
+    notifications: NotificationSettings = Field(default_factory=NotificationSettings)
+    test: TestSettings = Field(default_factory=TestSettings)
     site: RatingSiteSettings = Field(default_factory=RatingSiteSettings)
     scraper: ScraperSettings = Field(default_factory=ScraperSettings)
     html_ved: HtmlVedSettings = Field(default_factory=HtmlVedSettings)

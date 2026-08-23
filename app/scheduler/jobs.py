@@ -4,8 +4,10 @@ from datetime import datetime, timedelta
 from app.config import settings
 from app.db.session import session_scope
 from app.logging_config import get_logger
+from app.repository.notification_repository import NotificationRepository
 from app.repository.rating_repository import RatingRepository
 from app.repository.snapshot_repository import SnapshotRepository
+from app.services.notification_service import NotificationService
 from app.services.parser_service import ParserService
 from app.services.parsing_pipeline import ParsingPipeline, PipelineError
 
@@ -30,9 +32,10 @@ async def run_parsing_cycle() -> None:
         async with session_scope() as session:
             snapshot = SnapshotRepository(session)
             reader = RatingRepository(session)
+            notifications = NotificationRepository(session)
             try:
                 async with ParserService() as parser:
-                    report = await ParsingPipeline(parser, snapshot, reader).run()
+                    report = await ParsingPipeline(parser, snapshot, reader, notifications).run()
             except PipelineError as exc:
                 # Пайплайн уже откатил транзакцию — в БД остался прежний снапшот.
                 log.exception("Parsing cycle failed, snapshot not committed", stage=exc.stage)
@@ -46,3 +49,10 @@ async def run_parsing_cycle() -> None:
             return
 
         log.info("Parsing cycle completed", **report.summary())
+        await dispatch_pending_notifications()
+
+
+async def dispatch_pending_notifications() -> None:
+    """Отправляет накопленные Web Push уведомления."""
+    async with session_scope() as session:
+        await NotificationService(NotificationRepository(session)).dispatch_pending()

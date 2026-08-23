@@ -7,6 +7,7 @@
 
 import { $ } from "./utils.js";
 import { apiGet } from "./api.js";
+import { disableNotificationsForStoredSession } from "./notifications.js";
 import { clearZach, getZach, savedZach, setGroup, setZach } from "./store.js";
 import { switchTab } from "./nav.js";
 import { clearRating, loadRating } from "./view-rating.js";
@@ -46,6 +47,7 @@ async function loadGroup(zach) {
 }
 
 export function closeApp() {
+  disableNotificationsForStoredSession();
   clearZach();
   viewApp.hidden = true;
   viewLogin.hidden = false;

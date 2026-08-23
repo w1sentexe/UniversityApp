@@ -29,11 +29,13 @@ import asyncio
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from pydantic import BaseModel
 
 from app.config import settings
 from app.logging_config import get_logger
+from app.repository.notification_repository import NotificationRepository
 from app.repository.rating_repository import RatingRepository
 from app.repository.snapshot_repository import SnapshotRepository
 from app.services.group_extractor import GroupExtractor
@@ -58,6 +60,7 @@ class PipelineReport(BaseModel):
     skipped_blank: int = 0  # служебные строки ведомости без номера зачётки
     students_with_group: int = 0
     group_conflicts: int = 0  # зачётка встретилась более чем в одной группе
+    queued_notifications: int = 0
     snapshot_committed: bool = False
     links_s: float = 0.0
     parse_s: float = 0.0
@@ -97,10 +100,12 @@ class ParsingPipeline:
         parser: ParserService,
         snapshot: SnapshotRepository,
         reader: RatingRepository,
+        notifications: NotificationRepository | None = None,
     ) -> None:
         self._parser = parser
         self._snapshot = snapshot
         self._reader = reader
+        self._notifications = notifications
         self._stage_name = "initialization"
 
     @asynccontextmanager
@@ -153,6 +158,10 @@ class ParsingPipeline:
 
             async with self._stage(4, "committing snapshot") as r:
                 inserted = self._snapshot.rating_rows + self._snapshot.grade_rows
+                if self._notifications is not None:
+                    report.queued_notifications = await self._notifications.enqueue_current_rating_changes(
+                        cycle_id=f"parse-{uuid4().hex}"
+                    )
                 await self._snapshot.commit()
                 opened = False
                 report.snapshot_committed = True
@@ -166,6 +175,7 @@ class ParsingPipeline:
                 r["grade_rows"] = report.grade_rows
                 r["group_rows"] = counts["student_group"]
                 r["duplicate_keys"] = report.duplicate_keys
+                r["queued_notifications"] = report.queued_notifications
         except Exception as exc:
             # Снапшот не зафиксирован — откатываем, читатели остаются на прежних данных.
             if opened:

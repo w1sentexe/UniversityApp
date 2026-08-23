@@ -6,6 +6,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      SCHEDULER_INTERVAL_MINUTES: "10"
     volumes:
       # Файл SQLite держим в томе: пересборка образа не должна стирать снапшот.
       # Путь внутри контейнера задаётся переменной DB_PATH (см. .env.example).

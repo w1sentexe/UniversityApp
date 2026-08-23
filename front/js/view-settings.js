@@ -6,6 +6,7 @@
  */
 
 import { $, escapeHtml } from "./utils.js";
+import { disableNotifications, enableNotifications, notificationState } from "./notifications.js";
 import { getGroup, getZach } from "./store.js";
 import { applyTheme, currentTheme } from "./theme.js";
 
@@ -49,6 +50,14 @@ export function renderSettings() {
           </div>
         </div>
       </div>
+
+      <div class="set-card">
+        <p class="set-card__label">Уведомления</p>
+        <div class="set-row set-row--control">
+          <span class="set-row__k">Новый рейтинг</span>
+          <button class="btn btn--ghost set-action" type="button" data-push-toggle disabled>Проверяем…</button>
+        </div>
+      </div>
     </div>`;
 
   el.querySelectorAll("[data-set-theme]").forEach((b) =>
@@ -57,4 +66,38 @@ export function renderSettings() {
       renderSettings();
     }),
   );
+
+  syncNotificationControl();
+}
+
+async function syncNotificationControl() {
+  const button = document.querySelector("[data-push-toggle]");
+  if (!button) return;
+
+  try {
+    const state = await notificationState();
+    button.disabled = !state.supported || state.permission === "denied";
+    button.dataset.enabled = state.enabled ? "true" : "false";
+    button.textContent = state.enabled ? "Выключить" : state.label;
+    if (state.supported && !state.enabled && state.permission !== "denied") {
+      button.textContent = "Включить";
+    }
+  } catch (_) {
+    button.disabled = true;
+    button.textContent = "Недоступно";
+  }
+
+  button.addEventListener("click", async () => {
+    const zach = getZach();
+    if (!zach) return;
+    button.disabled = true;
+    const enabled = button.dataset.enabled === "true";
+    button.textContent = enabled ? "Выключаем…" : "Включаем…";
+    try {
+      if (enabled) await disableNotifications();
+      else await enableNotifications(zach);
+    } finally {
+      renderSettings();
+    }
+  });
 }
