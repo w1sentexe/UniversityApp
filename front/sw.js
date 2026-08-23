@@ -157,7 +157,7 @@ self.addEventListener("push", (e) => {
 
   const title = data.title || "Выставлен новый рейтинг";
   const options = {
-    body: data.body || "Откройте приложение, чтобы посмотреть изменения.",
+    body: data.body ?? "Откройте приложение, чтобы посмотреть изменения.",
     icon: "./resources/logo-192.png",
     badge: "./resources/logo-192.png",
     tag: data.tag || "rating-update",

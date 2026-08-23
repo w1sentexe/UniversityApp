@@ -364,16 +364,12 @@ def _notification_items_from_grades(rows) -> list[dict[str, str]]:
 
 def _payload(zach_number: str, changes: list[dict]) -> dict:
     first = changes[0]
-    title = "Выставлен новый рейтинг"
     if len(changes) == 1:
-        if first.get("change_kind") == "control_points":
-            body = f"{first['subject_name']}: обновлены контрольные точки"
-        else:
-            old_value = first["old_value"]
-            value_text = f"{old_value} → {first['new_value']}" if old_value is not None else str(first["new_value"])
-            body = f"{first['subject_name']}: {value_text}"
+        title = f"Выставлен новый рейтинг по дисциплине: {first['subject_name']}"
+        body = ""
     else:
-        body = f"Обновлены дисциплины: {len(changes)}"
+        title = "Выставлен новый рейтинг по нескольким дисциплинам"
+        body = ""
 
     return {
         "title": title,
