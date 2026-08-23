@@ -129,10 +129,13 @@ jobs:
             if [ "${{ needs.build_and_push.outputs.nginx_changed }}" = "true" ] || [ "${{ needs.build_and_push.outputs.frontend_changed }}" = "true" ] || [ "${{ needs.build_and_push.outputs.compose_changed }}" = "true" ]; then
               echo "==> Web serving changed, recreating nginx container"
               docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps nginx
-              docker compose -f docker-compose.prod.yml exec -T nginx nginx -t
             else
               echo "==> Web serving unchanged, skipping nginx restart"
             fi
+
+            echo "==> Validating and reloading nginx"
+            docker compose -f docker-compose.prod.yml exec -T nginx nginx -t
+            docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload
 
             echo "==> Smoke checks"
             curl -fsS https://universityapp.site/notifications/status >/dev/null
