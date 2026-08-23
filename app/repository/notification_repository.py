@@ -40,9 +40,7 @@ class NotificationRepository:
         auth: str,
     ) -> PushSubscription:
         now = utcnow()
-        subscription = await self._session.scalar(
-            select(PushSubscription).where(PushSubscription.endpoint == endpoint)
-        )
+        subscription = await self._session.scalar(select(PushSubscription).where(PushSubscription.endpoint == endpoint))
         if subscription is None:
             subscription = PushSubscription(
                 zach_number=zach_number,
@@ -69,9 +67,7 @@ class NotificationRepository:
         return subscription
 
     async def disable_subscription(self, endpoint: str) -> bool:
-        subscription = await self._session.scalar(
-            select(PushSubscription).where(PushSubscription.endpoint == endpoint)
-        )
+        subscription = await self._session.scalar(select(PushSubscription).where(PushSubscription.endpoint == endpoint))
         if subscription is None:
             return False
         subscription.enabled = False
@@ -224,9 +220,7 @@ class NotificationRepository:
 
     async def _state_map(self, zach_numbers: list[str]) -> dict[tuple[str, str, str], str]:
         rows = (
-            await self._session.execute(
-                select(RatingWatchState).where(RatingWatchState.zach_number.in_(zach_numbers))
-            )
+            await self._session.execute(select(RatingWatchState).where(RatingWatchState.zach_number.in_(zach_numbers)))
         ).scalars()
         return {(row.zach_number, row.ved_type, row.subject_name): row.last_value for row in rows}
 
