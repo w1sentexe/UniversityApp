@@ -34,8 +34,8 @@ function calculatedFinalRating(record) {
     .filter((value) => value !== null);
   if (totals.length === 0) return DASH;
 
-  const total = totals.reduce((sum, value) => sum + value, 0);
-  return Number.isInteger(total) ? String(total) : String(Number(total.toFixed(2)));
+  const average = totals.reduce((sum, value) => sum + value, 0) / totals.length;
+  return Number.isInteger(average) ? String(average) : String(Number(average.toFixed(2)));
 }
 
 /** Очистка при выходе из зачётки. */
