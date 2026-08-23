@@ -5,8 +5,8 @@
 (ParserService, RatingRepository) владеет вызывающий — пайплайн не открывает
 и не закрывает ресурсы, поэтому легко тестируется на подменах.
 
-Этапы: 1) доступность сайта, 2) сбор ссылок по группам, 3) парсинг ведомостей
-с записью в снапшот, 4) фиксация снапшота.
+Этапы: 1) доступность сайта, 2) сбор ссылок по группам, 3) парсинг ведомостей,
+4) короткая запись и фиксация нового снапшота.
 
 Чем это отличается от прежней версии на Redis. Там этапов было пять: перед
 записью приходилось вручную чистить фоновую БД, а в конце — переключать
@@ -144,19 +144,23 @@ class ParsingPipeline:
                 r["groups"] = report.groups
                 r["links"] = report.urls
 
-            async with self._stage(3, "parsing records into snapshot") as r:
-                await self._snapshot.begin()
-                opened = True
-                await self._parse_and_save(links, report)
+            async with self._stage(3, "parsing records") as r:
+                records, group_pairs, group_stats = await self._parse_records(links, report)
                 r["parsed"] = report.parsed_veds
                 r["empty"] = report.empty_veds
                 r["failed"] = report.failed_veds
                 r["records"] = report.total_records
-                r["students_with_group"] = report.students_with_group
-                r["group_conflicts"] = report.group_conflicts
-                r["skipped_blank"] = report.skipped_blank
+                r["students_with_group"] = group_stats["students"]
+                r["group_conflicts"] = group_stats["conflicts"]
 
-            async with self._stage(4, "committing snapshot") as r:
+            async with self._stage(4, "writing and committing snapshot") as r:
+                await self._snapshot.begin()
+                opened = True
+                await self._snapshot.add_records(records)
+                await self._snapshot.add_groups(group_pairs)
+                report.students_with_group = group_stats["students"]
+                report.group_conflicts = group_stats["conflicts"]
+                report.skipped_blank = self._snapshot.skipped_rows
                 inserted = self._snapshot.rating_rows + self._snapshot.grade_rows
                 if self._notifications is not None:
                     report.queued_notifications = await self._notifications.enqueue_current_rating_changes(
@@ -175,6 +179,7 @@ class ParsingPipeline:
                 r["grade_rows"] = report.grade_rows
                 r["group_rows"] = counts["student_group"]
                 r["duplicate_keys"] = report.duplicate_keys
+                r["skipped_blank"] = report.skipped_blank
                 r["queued_notifications"] = report.queued_notifications
         except Exception as exc:
             # Снапшот не зафиксирован — откатываем, читатели остаются на прежних данных.
@@ -195,12 +200,12 @@ class ParsingPipeline:
         report.links_s = time.monotonic() - t
         return links
 
-    async def _parse_and_save(
+    async def _parse_records(
         self,
         links: dict[str, list[str]],
         report: PipelineReport,
-    ) -> None:
-        """Разбирает ведомости и пишет их в открытый снапшот.
+    ) -> tuple[list, list[tuple[str, str]], dict[str, int]]:
+        """Разбирает ведомости без записи в БД.
 
         Ведомость обрабатывается вместе с названием своей группы, поэтому здесь
         же наполняется связка «зачётка → группа» — без обращений к сайту.
@@ -211,6 +216,8 @@ class ParsingPipeline:
         # пул, чтобы семафор равномерно грузил сайт, а не шёл группа за группой.
         tasks = [(group, url) for group, urls in links.items() for url in urls]
         completed = 0
+        parsed_records = []
+        records_lock = asyncio.Lock()
 
         async def handle(group: str, url: str) -> None:
             nonlocal completed
@@ -222,7 +229,8 @@ class ParsingPipeline:
             elif records:
                 report.parsed_veds += 1
                 extractor.feed(group, records)
-                await self._snapshot.add_records(records)
+                async with records_lock:
+                    parsed_records.extend(records)
                 report.total_records += len(records)
             else:
                 report.empty_veds += 1
@@ -240,9 +248,5 @@ class ParsingPipeline:
         await asyncio.gather(*(handle(group, url) for group, url in tasks))
         report.parse_s = time.monotonic() - t
 
-        # Связку пишем одним куском в конце: она нужна целиком, а её объём мал —
-        # одна строка на студента против десятков строк рейтинга.
-        await self._snapshot.add_groups(extractor.pairs())
-        report.students_with_group = extractor.students
-        report.group_conflicts = extractor.ambiguous
-        report.skipped_blank = self._snapshot.skipped_rows
+        group_stats = {"students": extractor.students, "conflicts": extractor.ambiguous}
+        return parsed_records, list(extractor.pairs()), group_stats

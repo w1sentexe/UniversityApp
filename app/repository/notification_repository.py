@@ -89,7 +89,8 @@ class NotificationRepository:
             subscription.failure_count = 0
             subscription.updated_at = now
 
-        await self._seed_watch_state(zach_number)
+        with self._session.no_autoflush:
+            await self._seed_watch_state(zach_number)
         await self._session.commit()
         await self._session.refresh(subscription)
         log.info("Push subscription saved", zach_number=zach_number, subscription_id=subscription.id)
