@@ -17,14 +17,33 @@ import { renderSettings } from "./view-settings.js";
 const viewLogin = $("#view-login");
 const viewApp = $("#view-app");
 const tabSettings = $("#tab-settings");
+const RETURN_REFRESH_COOLDOWN_MS = 3000;
+
+let lastReturnRefreshAt = 0;
 
 export function openApp(zach) {
   setZach(zach);
   viewLogin.hidden = true;
   viewApp.hidden = false;
   switchTab("rating");
+  refreshCurrentSession({ force: true });
+}
+
+function refreshCurrentSession({ force = false } = {}) {
+  const zach = getZach();
+  if (!zach || viewApp.hidden) return;
+
+  const now = Date.now();
+  if (!force && now - lastReturnRefreshAt < RETURN_REFRESH_COOLDOWN_MS) return;
+  lastReturnRefreshAt = now;
+
   loadRating(zach);
   loadGroup(zach);
+}
+
+function refreshWhenVisible({ force = false } = {}) {
+  if (document.visibilityState && document.visibilityState !== "visible") return;
+  refreshCurrentSession({ force });
 }
 
 /**
@@ -48,6 +67,7 @@ async function loadGroup(zach) {
 
 export function closeApp() {
   disableNotificationsForStoredSession();
+  lastReturnRefreshAt = 0;
   clearZach();
   viewApp.hidden = true;
   viewLogin.hidden = false;
@@ -74,5 +94,15 @@ export function restoreSession() {
   focusZachInput();
   return false;
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshWhenVisible();
+});
+
+window.addEventListener("focus", () => refreshWhenVisible());
+window.addEventListener("online", () => refreshWhenVisible({ force: true }));
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) refreshWhenVisible({ force: true });
+});
 
 export { getZach };
