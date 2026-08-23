@@ -90,9 +90,9 @@ async function syncNotificationControl() {
     if (state.supported && !state.enabled && state.permission !== "denied") {
       button.textContent = "Включить";
     }
-  } catch (_) {
+  } catch (err) {
     button.disabled = true;
-    button.textContent = "Недоступно";
+    button.textContent = err instanceof Error ? err.message : "Недоступно";
   }
 
   button.addEventListener("click", async () => {
@@ -104,8 +104,10 @@ async function syncNotificationControl() {
     try {
       if (enabled) await disableNotifications();
       else await enableNotifications(zach);
-    } finally {
       renderSettings();
+    } catch (err) {
+      button.disabled = false;
+      button.textContent = err instanceof Error ? err.message : "Ошибка";
     }
   });
 }

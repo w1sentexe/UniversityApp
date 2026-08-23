@@ -12,6 +12,14 @@ function supported() {
   );
 }
 
+async function serviceWorkerRegistration() {
+  if (!("serviceWorker" in navigator)) throw new Error("Service Worker недоступен");
+  const existing = await navigator.serviceWorker.getRegistration("./");
+  const registration = existing || (await navigator.serviceWorker.register("./sw.js"));
+  registration.update().catch(() => {});
+  return navigator.serviceWorker.ready;
+}
+
 function urlBase64ToUint8Array(value) {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -46,7 +54,7 @@ export async function notificationState() {
   const backend = await apiGet("/notifications/status");
   if (!backend.supported) return { supported: false, enabled: false, label: "Недоступно" };
   const permission = Notification.permission;
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await serviceWorkerRegistration();
   const subscription = await registration.pushManager.getSubscription();
   return {
     supported: true,
@@ -63,7 +71,7 @@ export async function enableNotifications(zach) {
   if (permission !== "granted") throw new Error("Notification permission denied");
 
   const { public_key: publicKey } = await apiGet("/notifications/vapid-public-key");
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await serviceWorkerRegistration();
   const existing = await registration.pushManager.getSubscription();
   const subscription =
     existing ||
@@ -82,7 +90,7 @@ export async function enableNotifications(zach) {
 export async function syncExistingNotificationSubscription(zach) {
   if (!supported() || Notification.permission !== "granted") return false;
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await serviceWorkerRegistration();
   const subscription = await registration.pushManager.getSubscription();
   if (!subscription) return false;
 
@@ -97,7 +105,7 @@ export async function syncExistingNotificationSubscription(zach) {
 export async function disableNotifications() {
   if (!supported()) return;
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await serviceWorkerRegistration();
   const subscription = await registration.pushManager.getSubscription();
   const endpoint = subscription ? subscription.endpoint : savedEndpoint();
 
