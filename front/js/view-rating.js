@@ -21,6 +21,23 @@ import {
 
 const ratingContent = $("#rating-content");
 
+function numericValue(value) {
+  if (isBlank(value)) return null;
+  const normalized = String(value).trim().replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function calculatedFinalRating(record) {
+  const totals = (record.control_points || [])
+    .map((cp) => numericValue(cp.total))
+    .filter((value) => value !== null);
+  if (totals.length === 0) return DASH;
+
+  const total = totals.reduce((sum, value) => sum + value, 0);
+  return Number.isInteger(total) ? String(total) : String(Number(total.toFixed(2)));
+}
+
 /** Очистка при выходе из зачётки. */
 export function clearRating() {
   ratingContent.innerHTML = "";
@@ -128,7 +145,7 @@ function renderRatingTable(records) {
       }
     }
 
-    row += `<td class="rt-rating">${showNum(rec.final_rating)}</td>`;
+    row += `<td class="rt-rating">${escapeHtml(calculatedFinalRating(rec))}</td>`;
     return `<tr>${row}</tr>`;
   }).join("");
 
