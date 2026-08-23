@@ -6,6 +6,22 @@
 .section { margin-top: 56px; animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }
 .section:first-child { margin-top: 8px; }
 
+.push-prompt {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  justify-content: space-between;
+  margin: 0 0 28px;
+  padding: .85rem 1rem;
+  background: color-mix(in srgb, var(--stamp) 7%, var(--paper-2));
+  border: 1px solid color-mix(in srgb, var(--stamp) 34%, var(--line));
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-size: .9rem;
+}
+.push-prompt[hidden] { display: none; }
+.push-prompt__btn { flex-shrink: 0; }
+
 .section__head {
   display: flex;
   align-items: baseline;
@@ -194,6 +210,14 @@ table { border-collapse: separate; border-spacing: 0; width: 100%; }
 
 /* --- мобильный экран --- */
 @media (max-width: 560px) {
+  .push-prompt {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .push-prompt__btn {
+    width: 100%;
+  }
+
   /* Оптимизация таблиц для мобильных устройств */
   .rt {
     table-layout: fixed;
