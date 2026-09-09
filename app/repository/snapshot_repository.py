@@ -20,9 +20,8 @@ from sqlalchemy import delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.db.models import SNAPSHOT_MODELS, GradeRecord, RatingRecord, StudentGroup
-from app.entities.not_rating_ved_model import NotRatingVedModel
-from app.entities.rating_ved_model import RatingVedModel
+from app.entities.models import SNAPSHOT_MODELS, GradeRecord, RatingRecord, StudentGroup
+from app.entities.schemas.rating import NotRatingVedModel, RatingVedModel
 from app.logging_config import get_logger
 
 log = get_logger(__name__)
@@ -38,7 +37,7 @@ _BLANK_ZACH = {"", "-"}
 
 
 def _as_text(value) -> str | None:
-    """Значение в текст для хранения (см. app/db/models.py).
+    """Значение в текст для хранения (см. app/entities/models).
 
     Enum разворачиваем через .value: у str-Enum в Python 3.12 str(member) даёт
     «VedType.ZACHET», а не «Зачет», и в БД поехали бы имена членов вместо значений.

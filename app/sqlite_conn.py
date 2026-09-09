@@ -13,23 +13,18 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
-from app.db.models import Base
+from app.entities.models import Base
 from app.logging_config import get_logger
 
 log = get_logger(__name__)
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
-
-
-def db_path() -> Path:
-    return Path(settings.db.path)
 
 
 def _apply_pragmas(engine: AsyncEngine) -> None:
@@ -60,7 +55,8 @@ def init_engine() -> AsyncEngine:
     if _engine is not None:
         return _engine
 
-    path = db_path()
+    # Каталог создаём, но не выбираем: путь пришёл из настроек целиком.
+    path = settings.db.path
     path.parent.mkdir(parents=True, exist_ok=True)
 
     _engine = create_async_engine(
@@ -107,7 +103,7 @@ async def init_models() -> None:
     engine = init_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    log.info("Database ready", path=str(db_path()))
+    log.info("Database ready", path=str(settings.db.path))
 
 
 async def dispose_engine() -> None:

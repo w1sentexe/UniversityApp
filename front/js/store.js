@@ -1,12 +1,12 @@
 /**
- * Состояние сессии: чей рейтинг сейчас открыт.
+ * Состояние сессии: чей рейтинг сейчас открыт и с какого раздела начинать.
  *
  * Вынесено отдельным модулем без импортов намеренно. Номер зачётки нужен и
  * экрану настроек, и экрану рейтинга, и логике входа. Если бы его хранил
  * session.js, получилось бы кольцо импортов: session → nav → settings → session.
  */
 
-import { STORAGE_KEYS } from "./config.js";
+import { DEFAULT_START_TAB, START_TABS, STORAGE_KEYS } from "./config.js";
 
 let currentZach = "";
 // Группа приходит с бека отдельным запросом и живёт только в памяти:
@@ -52,5 +52,29 @@ export function savedZach() {
     return localStorage.getItem(STORAGE_KEYS.zach);
   } catch (_) {
     return null;
+  }
+}
+
+/**
+ * Раздел, который открывается сразу после входа.
+ *
+ * Читается с проверкой по списку: в localStorage могло остаться имя раздела,
+ * которого больше нет, и switchTab тогда спрятал бы все панели разом.
+ */
+export function getStartTab() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(STORAGE_KEYS.startTab);
+  } catch (_) {
+    /* приватный режим — остаёмся на разделе по умолчанию */
+  }
+  return START_TABS.some((tab) => tab.id === saved) ? saved : DEFAULT_START_TAB;
+}
+
+export function setStartTab(name) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.startTab, name);
+  } catch (_) {
+    /* приватный режим — выбор не запомнится */
   }
 }

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.entities.group_schedule_model import GroupScheduleModel
+from app.entities.schemas.schedule import GroupScheduleModel
 from app.services.schedule_service import ScheduleService, get_schedule_service
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
@@ -19,6 +19,6 @@ async def by_group(
     group_name: str,
     schedule_service: ScheduleService = Depends(get_schedule_service),
 ) -> GroupScheduleModel:
-    """Расписание группы. Ключ — начало пары, конец лежит в поле endTime занятия."""
+    """Расписание группы: недели → дни → занятия, отсортированные по времени."""
     schedule = await schedule_service.for_group(group_name)
-    return GroupScheduleModel(group_name=group_name, schedule=schedule)
+    return GroupScheduleModel(name=group_name, schedule=schedule)

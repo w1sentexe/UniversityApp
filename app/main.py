@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
@@ -6,11 +7,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.db.session import dispose_engine, init_models, session_scope
 from app.logging_config import get_logger, print_banner, setup_logging
 from app.repository.rating_repository import RatingRepository
+from app.repository.snapshot_repository import SnapshotRepository
 from app.routers import rating_router, schedule_router, students_router
-from app.scheduler.jobs import run_parsing_cycle
+from app.services.parser_service import ParserService
+from app.services.parsing_pipeline import ParsingPipeline, PipelineError
+from app.sqlite_conn import dispose_engine, init_models, session_scope
 
 print_banner()
 setup_logging()
@@ -20,6 +23,46 @@ log = get_logger(__name__)
 # стартовый баннер ("Uvicorn running on ...") до старта тяжёлого цикла — иначе job
 # на том же event loop влезает в хвост стартовых логов.
 _FIRST_RUN_DELAY_S = 3
+
+# Гарантирует, что в один момент времени выполняется ровно один цикл парсинга
+# (подстраховка к max_instances=1 планировщика на случай ручного запуска).
+_running = asyncio.Lock()
+
+
+async def run_parsing_cycle() -> None:
+    """Полный цикл парсинга — единственная задача планировщика.
+
+    Сама работа живёт в ParsingPipeline; здесь только сборка зависимостей и
+    разбор исхода, поэтому отдельного слоя под это не заведено.
+    """
+
+    if _running.locked():
+        log.info("Parsing cycle is already running, skipping")
+        return
+
+    async with _running:
+        log.info("Start parsing cycle")
+        # Отдельная сессия на весь цикл: её транзакция держит новый снапшот до
+        # коммита, а запросы обслуживаются своими сессиями и видят прежний.
+        async with session_scope() as session:
+            snapshot = SnapshotRepository(session)
+            reader = RatingRepository(session)
+            try:
+                async with ParserService() as parser:
+                    report = await ParsingPipeline(parser, snapshot, reader).run()
+            except PipelineError as exc:
+                # Пайплайн уже откатил транзакцию — в БД остался прежний снапшот.
+                log.exception("Parsing cycle failed, snapshot not committed", stage=exc.stage)
+                return
+
+        if not report.site_available:
+            next_run = (datetime.now() + timedelta(minutes=settings.scheduler.interval_minutes)).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            log.warning("Parsing cycle postponed", url=settings.site.base_url, next_run=next_run)
+            return
+
+        log.info("Parsing cycle completed", **report.summary())
 
 
 @asynccontextmanager
@@ -31,7 +74,7 @@ async def lifespan(app: FastAPI):
     await init_models()
 
     # Сервисы больше не живут в app.state: их собирает цепочка зависимостей
-    # сессия → репозиторий → сервис на каждый запрос (см. app/db/session.py).
+    # сессия → репозиторий → сервис на каждый запрос (см. app/sqlite_conn.py).
     async with session_scope() as session:
         counts = await RatingRepository(session).counts()
     log.info("Snapshot on start", **counts)

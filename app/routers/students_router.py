@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from app.entities.student_exists_model import StudentExistsModel
-from app.entities.student_group_model import StudentGroupModel
+from app.entities.schemas.student_exists_model import StudentExistsModel
+from app.entities.schemas.student_group_model import StudentGroupModel
 from app.services.student_service import StudentService, get_student_service
 
 router = APIRouter(prefix="/students", tags=["students"])

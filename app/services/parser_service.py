@@ -15,8 +15,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.config import settings
-from app.entities.not_rating_ved_model import NotRatingVedModel
-from app.entities.rating_ved_model import RatingVedModel
+from app.entities.schemas.rating import NotRatingVedModel, RatingVedModel
 from app.logging_config import get_logger
 from app.parser.html_parser import parse_ved_html
 

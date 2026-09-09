@@ -2,9 +2,7 @@
 
 from fastapi import Depends
 
-from app.entities.enums import VedType
-from app.entities.not_rating_ved_model import NotRatingVedModel
-from app.entities.rating_ved_model import RatingVedModel
+from app.entities.schemas.rating import NotRatingVedModel, RatingVedModel, VedType
 from app.logging_config import get_logger
 from app.repository.rating_repository import RatingRepository, get_rating_repository
 

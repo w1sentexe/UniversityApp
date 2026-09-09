@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.entities.enums import VedType
-from app.entities.not_rating_ved_model import NotRatingVedModel
-from app.entities.rating_ved_model import RatingVedModel
+from app.entities.schemas.rating import NotRatingVedModel, RatingVedModel, VedType
 from app.services.rating_service import RatingService, get_rating_service
 
 router = APIRouter(prefix="/rating", tags=["rating"])

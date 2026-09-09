@@ -15,10 +15,10 @@ from fastapi import Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import GradeRecord, RatingRecord, StudentGroup
-from app.db.session import get_session
-from app.entities.enums import VedType
+from app.entities.models import GradeRecord, RatingRecord, StudentGroup
+from app.entities.schemas.rating import VedType
 from app.logging_config import get_logger
+from app.sqlite_conn import get_session
 
 log = get_logger(__name__)
 

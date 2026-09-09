@@ -2,8 +2,8 @@
 
 from fastapi import Depends
 
-from app.entities.student_exists_model import StudentExistsModel
-from app.entities.student_group_model import StudentGroupModel
+from app.entities.schemas.student_exists_model import StudentExistsModel
+from app.entities.schemas.student_group_model import StudentGroupModel
 from app.repository.rating_repository import RatingRepository, get_rating_repository
 
 

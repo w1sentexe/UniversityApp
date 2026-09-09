@@ -35,4 +35,13 @@ export const DASH = "—";
 export const STORAGE_KEYS = {
   zach: "rating:lastZach",
   theme: "rating:theme",
+  startTab: "rating:startTab",
 };
+
+/** Разделы, с которых можно начинать сессию, — выбор живёт в настройках. */
+export const START_TABS = [
+  { id: "rating", title: "Рейтинг" },
+  { id: "schedule", title: "Расписание" },
+];
+
+export const DEFAULT_START_TAB = "rating";

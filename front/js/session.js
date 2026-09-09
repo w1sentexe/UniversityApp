@@ -7,7 +7,7 @@
 
 import { $ } from "./utils.js";
 import { apiGet } from "./api.js";
-import { clearZach, getZach, savedZach, setGroup, setZach } from "./store.js";
+import { clearZach, getStartTab, getZach, savedZach, setGroup, setZach } from "./store.js";
 import { switchTab } from "./nav.js";
 import { clearRating, loadRating } from "./view-rating.js";
 import { focusZachInput, resetLoginForm } from "./login.js";
@@ -26,7 +26,9 @@ export function openApp(zach) {
   viewApp.hidden = false;
   resetSchedule();
   forgetSchedule();
-  switchTab("rating");
+  switchTab(getStartTab());
+  // Рейтинг грузим всегда, даже когда сессия начинается с расписания:
+  // переход на вкладку должен быть мгновенным, а не начинать загрузку заново.
   loadRating(zach);
   loadGroup(zach);
 }
