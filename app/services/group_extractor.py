@@ -13,8 +13,7 @@
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 
-from app.entities.not_rating_ved_model import NotRatingVedModel
-from app.entities.rating_ved_model import RatingVedModel
+from app.entities.schemas.rating import NotRatingVedModel, RatingVedModel
 from app.logging_config import get_logger
 
 log = get_logger(__name__)
@@ -51,7 +50,7 @@ class GroupExtractor:
     def feed(self, group_name: str, records: Sequence[VedRecord]) -> None:
         """Скармливает записи одной ведомости, зная её группу.
 
-        На вход идут ровно те модели, что вернул parse_ved_html.
+        На вход идут ровно те модели, что вернул ParserService.parse_ved.
         """
         if not group_name:
             return

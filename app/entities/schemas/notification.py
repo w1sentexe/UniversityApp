@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.entities.enums import VedType
+from app.entities.schemas.rating import VedType
 
 
 class PushKeysModel(BaseModel):

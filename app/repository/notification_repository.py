@@ -6,9 +6,16 @@ from fastapi import Depends
 from sqlalchemy import and_, distinct, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import GradeRecord, NotificationOutbox, PushSubscription, RatingRecord, RatingWatchState, utcnow
-from app.db.session import get_session
+from app.entities.models import (
+    GradeRecord,
+    NotificationOutbox,
+    PushSubscription,
+    RatingRecord,
+    RatingWatchState,
+    utcnow,
+)
 from app.logging_config import get_logger
+from app.sqlite_conn import get_session
 
 log = get_logger(__name__)
 

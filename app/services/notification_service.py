@@ -5,7 +5,7 @@ from datetime import timedelta
 from pywebpush import WebPushException, webpush
 
 from app.config import settings
-from app.db.models import NotificationOutbox, PushSubscription, utcnow
+from app.entities.models import NotificationOutbox, PushSubscription, utcnow
 from app.logging_config import get_logger
 from app.repository.notification_repository import NotificationRepository
 

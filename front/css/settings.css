@@ -19,7 +19,10 @@
 .set-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
 .set-row { display: flex; justify-content: space-between; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
 .set-row:last-child { border-bottom: none; }
-.set-row--control { align-items: center; padding: .2rem 0; border-bottom: none; }
+/* Переключатель переносим под подпись, когда они не помещаются в строку:
+   «Открывать при входе» рядом с «Рейтинг/Расписание» на узких экранах вылезал
+   за карточку и тянул горизонтальный скролл всей страницы. */
+.set-row--control { align-items: center; padding: .2rem 0; border-bottom: none; flex-wrap: wrap; row-gap: .5rem; }
 .set-row__k { color: var(--ink-soft); }
 .set-row__v { font-weight: 500; text-align: right; }
 .set-row__v--code { font-family: var(--font-mono); font-weight: 700; letter-spacing: .04em; }

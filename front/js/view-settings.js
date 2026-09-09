@@ -1,18 +1,19 @@
 /**
- * Экран настроек: карточка профиля и выбор темы.
+ * Экран настроек: карточка профиля, выбор темы и стартового раздела.
  *
- * Перерисовывается целиком при каждом открытии вкладки и после смены темы —
+ * Перерисовывается целиком при каждом открытии вкладки и после смены настройки —
  * состояния тут нет, всё берётся из store и theme.
  */
 
+import { START_TABS } from "./config.js";
 import { $, escapeHtml } from "./utils.js";
+import { getGroup, getStartTab, getZach, setStartTab } from "./store.js";
 import {
   disableNotifications,
   enableNotifications,
   notificationState,
   syncExistingNotificationSubscription,
 } from "./notifications.js";
-import { getGroup, getZach } from "./store.js";
 import { applyTheme, currentTheme } from "./theme.js";
 
 /**
@@ -28,6 +29,7 @@ function groupLabel() {
 export function renderSettings() {
   const el = $("#settings-content");
   const theme = currentTheme();
+  const startTab = getStartTab();
 
   el.innerHTML = `
     <div class="settings">
@@ -57,6 +59,18 @@ export function renderSettings() {
       </div>
 
       <div class="set-card">
+        <p class="set-card__label">Запуск</p>
+        <div class="set-row set-row--control">
+          <span class="set-row__k">Открывать при входе</span>
+          <div class="seg" role="group" aria-label="Раздел при входе">
+            ${START_TABS.map(
+              (tab) =>
+                `<button class="seg__btn ${tab.id === startTab ? "is-active" : ""}" type="button" data-set-start="${tab.id}">${tab.title}</button>`,
+            ).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="set-card">
         <p class="set-card__label">Уведомления</p>
         <div class="set-row set-row--control">
           <span class="set-row__k">Новый рейтинг</span>
@@ -78,6 +92,12 @@ export function renderSettings() {
     }),
   );
 
+  el.querySelectorAll("[data-set-start]").forEach((b) =>
+    b.addEventListener("click", () => {
+      setStartTab(b.dataset.setStart);
+      renderSettings();
+    }),
+  );
   syncNotificationControl();
 }
 

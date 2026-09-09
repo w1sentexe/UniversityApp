@@ -35,4 +35,24 @@ export const DASH = "—";
 export const STORAGE_KEYS = {
   zach: "rating:lastZach",
   theme: "rating:theme",
+  startTab: "rating:startTab",
+  // К ключу дописывается номер зачётки: подгруппа у каждого студента своя.
+  subgroup: "rating:subgroup",
 };
+
+/** Фильтр расписания по подгруппе: 0 — без фильтра, дальше номер подгруппы. */
+export const SUBGROUPS = [
+  { value: 0, label: "Все" },
+  { value: 1, label: "1" },
+  { value: 2, label: "2" },
+];
+
+export const DEFAULT_SUBGROUP = 0;
+
+/** Разделы, с которых можно начинать сессию, — выбор живёт в настройках. */
+export const START_TABS = [
+  { id: "rating", title: "Рейтинг" },
+  { id: "schedule", title: "Расписание" },
+];
+
+export const DEFAULT_START_TAB = "rating";

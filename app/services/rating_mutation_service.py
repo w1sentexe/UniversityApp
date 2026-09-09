@@ -4,8 +4,8 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import RatingRecord
-from app.entities.notification_models import (
+from app.entities.models import RatingRecord
+from app.entities.schemas.notification import (
     ControlPointMutationRequest,
     ControlPointMutationResponse,
     RatingMutationRequest,

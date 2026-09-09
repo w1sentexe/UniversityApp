@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
@@ -7,11 +8,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import settings
-from app.db.session import dispose_engine, init_models, session_scope
 from app.logging_config import get_logger, print_banner, setup_logging
+from app.repository.notification_repository import NotificationRepository
 from app.repository.rating_repository import RatingRepository
+from app.repository.snapshot_repository import SnapshotRepository
 from app.routers import notifications_router, rating_router, schedule_router, students_router
-from app.scheduler.jobs import dispatch_pending_notifications, run_parsing_cycle
+from app.services.notification_service import NotificationService
+from app.services.parser_service import ParserService
+from app.services.parsing_pipeline import ParsingPipeline, PipelineError
+from app.sqlite_conn import dispose_engine, init_models, session_scope
 from app.time_utils import APP_TIMEZONE, local_now
 
 print_banner()
@@ -23,6 +28,50 @@ log = get_logger(__name__)
 # на том же event loop влезает в хвост стартовых логов.
 _FIRST_RUN_DELAY_S = 3
 
+# Гарантирует, что в один момент времени выполняется ровно один цикл парсинга
+# (подстраховка к max_instances=1 планировщика на случай ручного запуска).
+_running = asyncio.Lock()
+
+
+async def run_parsing_cycle() -> None:
+    """Полный цикл парсинга."""
+
+    if _running.locked():
+        log.info("Parsing cycle is already running, skipping")
+        return
+
+    async with _running:
+        log.info("Start parsing cycle")
+        # Отдельная сессия для короткой записи снапшота и очереди уведомлений.
+        # Сбор данных с сайта проходит до начала транзакции записи.
+        async with session_scope() as session:
+            snapshot = SnapshotRepository(session)
+            reader = RatingRepository(session)
+            notifications = NotificationRepository(session)
+            try:
+                async with ParserService() as parser:
+                    report = await ParsingPipeline(parser, snapshot, reader, notifications).run()
+            except PipelineError as exc:
+                # Пайплайн уже откатил транзакцию — в БД остался прежний снапшот.
+                log.exception("Parsing cycle failed, snapshot not committed", stage=exc.stage)
+                return
+
+        if not report.site_available:
+            next_run = (local_now() + timedelta(minutes=settings.scheduler.interval_minutes)).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+            log.warning("Parsing cycle postponed", url=settings.site.base_url, next_run=next_run)
+            return
+
+        log.info("Parsing cycle completed", **report.summary())
+        await dispatch_pending_notifications()
+
+
+async def dispatch_pending_notifications() -> None:
+    """Отправляет накопленные Web Push уведомления."""
+    async with session_scope() as session:
+        await NotificationService(NotificationRepository(session)).dispatch_pending()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,7 +82,7 @@ async def lifespan(app: FastAPI):
     await init_models()
 
     # Сервисы больше не живут в app.state: их собирает цепочка зависимостей
-    # сессия → репозиторий → сервис на каждый запрос (см. app/db/session.py).
+    # сессия → репозиторий → сервис на каждый запрос (см. app/sqlite_conn.py).
     async with session_scope() as session:
         counts = await RatingRepository(session).counts()
     log.info("Snapshot on start", **counts)

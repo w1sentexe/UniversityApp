@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,12 +19,14 @@ class DatabaseSettings(BaseSettings):
     """SQLite: путь до файла БД и параметры соединения.
 
     Путь — переменная окружения: в контейнере это примонтированный том,
-    при локальной отладке — файл рядом с проектом.
+    при локальной отладке — файл рядом с проектом. Тип Path, а не str, чтобы
+    решение «где лежит файл» целиком осталось здесь: движку остаётся открыть
+    готовый путь, а не достраивать его.
     """
 
     model_config = {**_ENV, "env_prefix": "DB_"}
 
-    path: str = "data/rating.sqlite3"
+    path: Path = Path("data/rating.sqlite3")
     # Сколько операция БД ждёт освобождения SQLite-lock, прежде чем упасть с
     # SQLITE_BUSY. Цикл парсинга теперь держит writer-lock только во время
     # короткой записи снапшота, поэтому этого окна достаточно для конкурирующих

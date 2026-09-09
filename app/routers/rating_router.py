@@ -2,25 +2,23 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.db.session import get_session, session_scope
-from app.entities.enums import VedType
-from app.entities.not_rating_ved_model import NotRatingVedModel
-from app.entities.notification_models import (
+from app.entities.schemas.notification import (
     ControlPointMutationRequest,
     ControlPointMutationResponse,
     RatingMutationRequest,
     RatingMutationResponse,
 )
-from app.entities.rating_ved_model import RatingVedModel
+from app.entities.schemas.rating import NotRatingVedModel, RatingVedModel, VedType
 from app.repository.notification_repository import NotificationRepository
 from app.services.notification_service import NotificationService
 from app.services.rating_mutation_service import RatingMutationService
 from app.services.rating_service import RatingService, get_rating_service
+from app.sqlite_conn import get_session, session_scope
 
 router = APIRouter(prefix="/rating", tags=["rating"])
 
 # Зачёт и экзамен возвращают записи обеих форм: ведомость без колонок КТ парсер
-# относит к оценочному формату независимо от вида (см. app/parser/html_parser.py).
+# относит к оценочному формату независимо от вида (см. app/services/parser_service.py).
 
 
 @router.get("/{zach_number}/zachet")

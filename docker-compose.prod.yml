@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/w1sentexe/backend:${IMAGE_TAG:-latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/w1sentexe/backend}:${IMAGE_TAG:-latest}
     container_name: vsuet_rating_v2-fastapi
     env_file:
       - .env
@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
     networks:
       - default
-      - web 
+      - web
 
   nginx:
     image: nginx:alpine

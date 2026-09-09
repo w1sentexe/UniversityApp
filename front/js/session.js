@@ -8,14 +8,17 @@
 import { $ } from "./utils.js";
 import { apiGet } from "./api.js";
 import { disableNotificationsForStoredSession } from "./notifications.js";
-import { clearZach, getZach, savedZach, setGroup, setZach } from "./store.js";
+import { clearZach, getStartTab, getZach, savedZach, setGroup, setZach } from "./store.js";
 import { switchTab } from "./nav.js";
 import { clearRating, loadRating } from "./view-rating.js";
 import { focusZachInput, resetLoginForm } from "./login.js";
+import { renderSchedule, resetSchedule } from "./view-schedule.js";
+import { forgetSchedule } from "./data/schedule.js";
 import { renderSettings } from "./view-settings.js";
 
 const viewLogin = $("#view-login");
 const viewApp = $("#view-app");
+const tabSchedule = $("#tab-schedule");
 const tabSettings = $("#tab-settings");
 const RETURN_REFRESH_COOLDOWN_MS = 3000;
 
@@ -25,7 +28,9 @@ export function openApp(zach) {
   setZach(zach);
   viewLogin.hidden = true;
   viewApp.hidden = false;
-  switchTab("rating");
+  resetSchedule();
+  forgetSchedule();
+  switchTab(getStartTab());
   refreshCurrentSession({ force: true });
 }
 
@@ -63,12 +68,14 @@ async function loadGroup(zach) {
   }
   // Экраны, ждавшие группу, перерисовываем по приходу ответа.
   if (tabSettings && !tabSettings.hidden) renderSettings();
+  if (tabSchedule && !tabSchedule.hidden) renderSchedule();
 }
 
 export function closeApp() {
   disableNotificationsForStoredSession();
   lastReturnRefreshAt = 0;
   clearZach();
+  forgetSchedule();
   viewApp.hidden = true;
   viewLogin.hidden = false;
   clearRating();

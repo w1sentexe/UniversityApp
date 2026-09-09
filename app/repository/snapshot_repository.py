@@ -20,14 +20,13 @@ from sqlalchemy import delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.db.models import SNAPSHOT_MODELS, GradeRecord, RatingRecord, StudentGroup
-from app.entities.not_rating_ved_model import NotRatingVedModel
-from app.entities.rating_ved_model import RatingVedModel
+from app.entities.models import SNAPSHOT_MODELS, GradeRecord, RatingRecord, StudentGroup
+from app.entities.schemas.rating import NotRatingVedModel, RatingVedModel
 from app.logging_config import get_logger
 
 log = get_logger(__name__)
 
-# Парсер отдаёт готовые доменные модели, а не словари (см. parse_ved_html).
+# Парсер отдаёт готовые доменные модели, а не словари (см. _parse_ved_html).
 VedRecord = RatingVedModel | NotRatingVedModel
 
 # Прочерк — то, что парсер подставляет в пустую ячейку. Строки без номера
@@ -38,7 +37,7 @@ _BLANK_ZACH = {"", "-"}
 
 
 def _as_text(value) -> str | None:
-    """Значение в текст для хранения (см. app/db/models.py).
+    """Значение в текст для хранения (см. app/entities/models).
 
     Enum разворачиваем через .value: у str-Enum в Python 3.12 str(member) даёт
     «VedType.ZACHET», а не «Зачет», и в БД поехали бы имена членов вместо значений.
@@ -91,7 +90,7 @@ class SnapshotRepository:
             # Ветвимся по фактическому типу модели, а НЕ по виду ведомости:
             # парсер выбирает форму по наличию колонок КТ, поэтому зачёт или
             # экзамен без контрольных точек приходит оценочной записью
-            # (см. is_rating в app/parser/html_parser.py).
+            # (см. is_rating в app/services/parser_service.py).
             if isinstance(rec, RatingVedModel):
                 points = [cp.model_dump() for cp in rec.control_points]
                 rating_rows.append(

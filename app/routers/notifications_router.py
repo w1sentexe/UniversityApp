@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.config import settings
-from app.entities.notification_models import (
+from app.entities.schemas.notification import (
     NotificationDebugModel,
     NotificationStatusModel,
     SubscribeRequest,
