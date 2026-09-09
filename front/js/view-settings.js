@@ -8,6 +8,12 @@
 import { START_TABS } from "./config.js";
 import { $, escapeHtml } from "./utils.js";
 import { getGroup, getStartTab, getZach, setStartTab } from "./store.js";
+import {
+  disableNotifications,
+  enableNotifications,
+  notificationState,
+  syncExistingNotificationSubscription,
+} from "./notifications.js";
 import { applyTheme, currentTheme } from "./theme.js";
 
 /**
@@ -64,6 +70,19 @@ export function renderSettings() {
           </div>
         </div>
       </div>
+      <div class="set-card">
+        <p class="set-card__label">Уведомления</p>
+        <div class="set-row set-row--control">
+          <span class="set-row__k">Новый рейтинг</span>
+          <label class="switch">
+            <input class="switch__input" type="checkbox" role="switch" data-push-toggle disabled />
+            <span class="switch__track" aria-hidden="true">
+              <span class="switch__thumb"></span>
+            </span>
+            <span class="switch__text" data-push-status>Проверяем…</span>
+          </label>
+        </div>
+      </div>
     </div>`;
 
   el.querySelectorAll("[data-set-theme]").forEach((b) =>
@@ -79,4 +98,41 @@ export function renderSettings() {
       renderSettings();
     }),
   );
+  syncNotificationControl();
+}
+
+async function syncNotificationControl() {
+  const toggle = document.querySelector("[data-push-toggle]");
+  const status = document.querySelector("[data-push-status]");
+  if (!toggle || !status) return;
+
+  try {
+    const state = await notificationState();
+    const zach = getZach();
+    if (state.enabled && zach) await syncExistingNotificationSubscription(zach);
+
+    toggle.disabled = !state.supported || state.permission === "denied" || !zach;
+    toggle.checked = state.enabled;
+    status.textContent = state.permission === "denied" ? "Запрещены" : state.enabled ? "Включены" : "Выключены";
+  } catch (err) {
+    toggle.disabled = true;
+    status.textContent = err instanceof Error ? err.message : "Недоступно";
+  }
+
+  toggle.addEventListener("change", async () => {
+    const zach = getZach();
+    if (!zach) return;
+    const enabled = toggle.checked;
+    toggle.disabled = true;
+    status.textContent = enabled ? "Включаем…" : "Выключаем…";
+    try {
+      if (enabled) await enableNotifications(zach);
+      else await disableNotifications();
+      renderSettings();
+    } catch (err) {
+      toggle.checked = !enabled;
+      toggle.disabled = false;
+      status.textContent = err instanceof Error ? err.message : "Ошибка";
+    }
+  });
 }

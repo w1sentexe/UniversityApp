@@ -2,9 +2,11 @@ import logging
 import os
 import sys
 from collections.abc import MutableMapping
+from datetime import datetime
 from typing import Any
 
 from app.config import settings
+from app.time_utils import APP_TIMEZONE
 
 # Контекст для трассировочных идентификаторов (например, REQUEST-UUID).
 # default=None (а не {}): общий изменяемый дефолт — footgun, а пустой dict и None
@@ -43,6 +45,10 @@ def get_logger(name: str) -> KVLogger:
 class CustomFormatter(logging.Formatter):
     def __init__(self) -> None:
         super().__init__(datefmt="%Y-%m-%d %H:%M:%S")
+
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        dt = datetime.fromtimestamp(record.created, tz=APP_TIMEZONE)
+        return dt.strftime(datefmt or "%Y-%m-%d %H:%M:%S")
 
     def format(self, record: logging.LogRecord) -> str:
         # Форматируем время с добавлением миллисекунд (через запятую)

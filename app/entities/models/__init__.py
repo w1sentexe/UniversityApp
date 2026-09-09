@@ -8,10 +8,13 @@
 расписание живёт своей жизнью (см. GroupSchedule).
 """
 
-from app.entities.models.base import Base
+from app.entities.models.base import Base, utcnow
 from app.entities.models.grade_record import GradeRecord
 from app.entities.models.group_schedule import GroupSchedule
+from app.entities.models.notification_outbox import NotificationOutbox
+from app.entities.models.push_subscription import PushSubscription
 from app.entities.models.rating_record import RatingRecord
+from app.entities.models.rating_watch_state import RatingWatchState
 from app.entities.models.student_group import StudentGroup
 
 # Таблицы снапшота рейтинга в порядке очистки перед заливкой нового цикла.
@@ -23,6 +26,10 @@ __all__ = [
     "Base",
     "GradeRecord",
     "GroupSchedule",
+    "NotificationOutbox",
+    "PushSubscription",
     "RatingRecord",
+    "RatingWatchState",
     "StudentGroup",
+    "utcnow",
 ]

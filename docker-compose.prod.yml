@@ -4,6 +4,8 @@ services:
     container_name: vsuet_rating_v2-fastapi
     env_file:
       - .env
+    environment:
+      SCHEDULER_INTERVAL_MINUTES: "10"
     volumes:
       # Снапшот переживает выкатку новой версии образа.
       # Путь внутри контейнера задаётся переменной DB_PATH (см. .env.example).

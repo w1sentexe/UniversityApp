@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
@@ -9,12 +9,15 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import settings
 from app.logging_config import get_logger, print_banner, setup_logging
+from app.repository.notification_repository import NotificationRepository
 from app.repository.rating_repository import RatingRepository
 from app.repository.snapshot_repository import SnapshotRepository
-from app.routers import rating_router, schedule_router, students_router
+from app.routers import notifications_router, rating_router, schedule_router, students_router
+from app.services.notification_service import NotificationService
 from app.services.parser_service import ParserService
 from app.services.parsing_pipeline import ParsingPipeline, PipelineError
 from app.sqlite_conn import dispose_engine, init_models, session_scope
+from app.time_utils import APP_TIMEZONE, local_now
 
 print_banner()
 setup_logging()
@@ -31,11 +34,7 @@ _running = asyncio.Lock()
 
 
 async def run_parsing_cycle() -> None:
-    """Полный цикл парсинга — единственная задача планировщика.
-
-    Сама работа живёт в ParsingPipeline; здесь только сборка зависимостей и
-    разбор исхода, поэтому отдельного слоя под это не заведено.
-    """
+    """Полный цикл парсинга."""
 
     if _running.locked():
         log.info("Parsing cycle is already running, skipping")
@@ -43,27 +42,35 @@ async def run_parsing_cycle() -> None:
 
     async with _running:
         log.info("Start parsing cycle")
-        # Отдельная сессия на весь цикл: её транзакция держит новый снапшот до
-        # коммита, а запросы обслуживаются своими сессиями и видят прежний.
+        # Отдельная сессия для короткой записи снапшота и очереди уведомлений.
+        # Сбор данных с сайта проходит до начала транзакции записи.
         async with session_scope() as session:
             snapshot = SnapshotRepository(session)
             reader = RatingRepository(session)
+            notifications = NotificationRepository(session)
             try:
                 async with ParserService() as parser:
-                    report = await ParsingPipeline(parser, snapshot, reader).run()
+                    report = await ParsingPipeline(parser, snapshot, reader, notifications).run()
             except PipelineError as exc:
                 # Пайплайн уже откатил транзакцию — в БД остался прежний снапшот.
                 log.exception("Parsing cycle failed, snapshot not committed", stage=exc.stage)
                 return
 
         if not report.site_available:
-            next_run = (datetime.now() + timedelta(minutes=settings.scheduler.interval_minutes)).strftime(
+            next_run = (local_now() + timedelta(minutes=settings.scheduler.interval_minutes)).strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
             log.warning("Parsing cycle postponed", url=settings.site.base_url, next_run=next_run)
             return
 
         log.info("Parsing cycle completed", **report.summary())
+        await dispatch_pending_notifications()
+
+
+async def dispatch_pending_notifications() -> None:
+    """Отправляет накопленные Web Push уведомления."""
+    async with session_scope() as session:
+        await NotificationService(NotificationRepository(session)).dispatch_pending()
 
 
 @asynccontextmanager
@@ -80,19 +87,18 @@ async def lifespan(app: FastAPI):
         counts = await RatingRepository(session).counts()
     log.info("Snapshot on start", **counts)
 
-    # Если снапшота ещё нет — первый запуск парсинга сразу после старта
-    # (с небольшой задержкой, чтобы не влезть в стартовые логи uvicorn).
-    empty = all(n == 0 for n in counts.values())
-    first_run = datetime.now() + timedelta(seconds=_FIRST_RUN_DELAY_S) if empty else None
-    if empty:
-        log.info("Database is empty — parsing cycle will run shortly after startup", delay_s=_FIRST_RUN_DELAY_S)
-    else:
-        log.info(
-            "Database already contains data — immediate parsing cycle skipped",
-            next_run_in_min=settings.scheduler.interval_minutes,
-        )
+    # Первый запуск парсинга всегда сразу после старта: даже существующий снапшот
+    # нужно обновить после деплоя/рестарта, а затем продолжать по интервалу.
+    first_run_delay = timedelta(seconds=_FIRST_RUN_DELAY_S)
+    first_run = local_now() + first_run_delay
+    log.info(
+        "Parsing cycle will run shortly after startup",
+        delay_s=_FIRST_RUN_DELAY_S,
+        interval_min=settings.scheduler.interval_minutes,
+        first_run_at=first_run.strftime("%Y-%m-%d %H:%M:%S"),
+    )
 
-    scheduler = AsyncIOScheduler()
+    scheduler = AsyncIOScheduler(timezone=APP_TIMEZONE)
     scheduler.add_job(
         run_parsing_cycle,
         trigger="interval",
@@ -101,6 +107,14 @@ async def lifespan(app: FastAPI):
         max_instances=1,
         coalesce=True,
         next_run_time=first_run,
+    )
+    scheduler.add_job(
+        dispatch_pending_notifications,
+        trigger="interval",
+        seconds=settings.notifications.dispatch_interval_seconds,
+        id="push_dispatch",
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.start()
     app.state.scheduler = scheduler
@@ -124,6 +138,7 @@ app.add_middleware(
 )
 app.include_router(students_router.router)
 app.include_router(rating_router.router)
+app.include_router(notifications_router.router)
 
 app.include_router(schedule_router.router)
 Instrumentator(

@@ -7,18 +7,22 @@
 
 import { $ } from "./utils.js";
 import { apiGet } from "./api.js";
+import { disableNotificationsForStoredSession } from "./notifications.js";
 import { clearZach, getStartTab, getZach, savedZach, setGroup, setZach } from "./store.js";
 import { switchTab } from "./nav.js";
 import { clearRating, loadRating } from "./view-rating.js";
 import { focusZachInput, resetLoginForm } from "./login.js";
 import { renderSchedule, resetSchedule } from "./view-schedule.js";
-import { renderSettings } from "./view-settings.js";
 import { forgetSchedule } from "./data/schedule.js";
+import { renderSettings } from "./view-settings.js";
 
 const viewLogin = $("#view-login");
 const viewApp = $("#view-app");
-const tabSettings = $("#tab-settings");
 const tabSchedule = $("#tab-schedule");
+const tabSettings = $("#tab-settings");
+const RETURN_REFRESH_COOLDOWN_MS = 3000;
+
+let lastReturnRefreshAt = 0;
 
 export function openApp(zach) {
   setZach(zach);
@@ -27,10 +31,24 @@ export function openApp(zach) {
   resetSchedule();
   forgetSchedule();
   switchTab(getStartTab());
-  // Рейтинг грузим всегда, даже когда сессия начинается с расписания:
-  // переход на вкладку должен быть мгновенным, а не начинать загрузку заново.
+  refreshCurrentSession({ force: true });
+}
+
+function refreshCurrentSession({ force = false } = {}) {
+  const zach = getZach();
+  if (!zach || viewApp.hidden) return;
+
+  const now = Date.now();
+  if (!force && now - lastReturnRefreshAt < RETURN_REFRESH_COOLDOWN_MS) return;
+  lastReturnRefreshAt = now;
+
   loadRating(zach);
   loadGroup(zach);
+}
+
+function refreshWhenVisible({ force = false } = {}) {
+  if (document.visibilityState && document.visibilityState !== "visible") return;
+  refreshCurrentSession({ force });
 }
 
 /**
@@ -54,6 +72,8 @@ async function loadGroup(zach) {
 }
 
 export function closeApp() {
+  disableNotificationsForStoredSession();
+  lastReturnRefreshAt = 0;
   clearZach();
   forgetSchedule();
   viewApp.hidden = true;
@@ -81,5 +101,15 @@ export function restoreSession() {
   focusZachInput();
   return false;
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshWhenVisible();
+});
+
+window.addEventListener("focus", () => refreshWhenVisible());
+window.addEventListener("online", () => refreshWhenVisible({ force: true }));
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) refreshWhenVisible({ force: true });
+});
 
 export { getZach };

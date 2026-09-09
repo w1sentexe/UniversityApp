@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import DeclarativeBase
 
 
@@ -8,3 +10,7 @@ class Base(DeclarativeBase):
     app/entities/models/__init__.py — иначе её таблицы не окажется в metadata
     и create_all её не создаст.
     """
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)

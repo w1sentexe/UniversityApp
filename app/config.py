@@ -27,10 +27,11 @@ class DatabaseSettings(BaseSettings):
     model_config = {**_ENV, "env_prefix": "DB_"}
 
     path: Path = Path("data/rating.sqlite3")
-    # Сколько читатель ждёт освобождения блокировки, прежде чем упасть с
-    # SQLITE_BUSY. Цикл парсинга держит запись долго, но в режиме WAL читателей
-    # он не блокирует — таймаут нужен лишь на короткие моменты чекпоинта.
-    busy_timeout_ms: int = 5000
+    # Сколько операция БД ждёт освобождения SQLite-lock, прежде чем упасть с
+    # SQLITE_BUSY. Цикл парсинга теперь держит writer-lock только во время
+    # короткой записи снапшота, поэтому этого окна достаточно для конкурирующих
+    # пользовательских записей вроде включения уведомлений.
+    busy_timeout_ms: int = 30000
     # Размер батча при заливке снапшота: компромисс между числом executemany
     # и объёмом удерживаемых в памяти строк.
     write_batch_size: int = 2000
@@ -45,7 +46,28 @@ class SchedulerSettings(BaseSettings):
 
     model_config = {**_ENV, "env_prefix": "SCHEDULER_"}
 
-    interval_minutes: int = 30
+    interval_minutes: int = 10
+
+
+class NotificationSettings(BaseSettings):
+    """Web Push: VAPID-ключи и параметры отправки уведомлений."""
+
+    model_config = {**_ENV, "env_prefix": "NOTIFICATIONS_"}
+
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    vapid_subject: str = "mailto:admin@example.com"
+    dispatch_interval_seconds: int = 60
+    ttl_seconds: int = 86400
+    max_attempts: int = 5
+
+
+class TestSettings(BaseSettings):
+    """Ручные тестовые эндпоинты, требующие токен в X-Test-Token."""
+
+    model_config = {**_ENV, "env_prefix": "TEST_"}
+
+    mutation_token: str | None = None
 
 
 class RatingSiteSettings(BaseSettings):
@@ -112,6 +134,7 @@ class LoggingSettings(BaseSettings):
     model_config = {**_ENV, "env_prefix": "LOG_"}
 
     level: str = "INFO"
+    timezone: str = "Europe/Moscow"
 
     reset: str = "\033[0m"
     time_color: str = "\033[94m"
@@ -139,6 +162,8 @@ class Settings(BaseModel):
     parsing: ParsingSettings = Field(default_factory=ParsingSettings)
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
+    notifications: NotificationSettings = Field(default_factory=NotificationSettings)
+    test: TestSettings = Field(default_factory=TestSettings)
     site: RatingSiteSettings = Field(default_factory=RatingSiteSettings)
     scraper: ScraperSettings = Field(default_factory=ScraperSettings)
     html_ved: HtmlVedSettings = Field(default_factory=HtmlVedSettings)
