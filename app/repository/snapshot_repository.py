@@ -26,7 +26,7 @@ from app.logging_config import get_logger
 
 log = get_logger(__name__)
 
-# Парсер отдаёт готовые доменные модели, а не словари (см. parse_ved_html).
+# Парсер отдаёт готовые доменные модели, а не словари (см. _parse_ved_html).
 VedRecord = RatingVedModel | NotRatingVedModel
 
 # Прочерк — то, что парсер подставляет в пустую ячейку. Строки без номера
@@ -90,7 +90,7 @@ class SnapshotRepository:
             # Ветвимся по фактическому типу модели, а НЕ по виду ведомости:
             # парсер выбирает форму по наличию колонок КТ, поэтому зачёт или
             # экзамен без контрольных точек приходит оценочной записью
-            # (см. is_rating в app/parser/html_parser.py).
+            # (см. is_rating в app/services/parser_service.py).
             if isinstance(rec, RatingVedModel):
                 points = [cp.model_dump() for cp in rec.control_points]
                 rating_rows.append(

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main"]
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: backend
@@ -26,6 +30,19 @@ jobs:
       - name: Run pre-commit hooks
         uses: pre-commit/action@v3.0.1
 
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify image and Excel import before merge
+        run: |
+          docker build -t vsuet-schedule-check .
+          docker run --rm --network none --user 1000:1000 --tmpfs /data:rw,mode=1777 \
+            -e PARSING_YEAR=test -e PARSING_SEMESTER=0 \
+            vsuet-schedule-check python -c \
+            "import sqlite3; db = sqlite3.connect('/data/rating.sqlite3'); assert db.execute('SELECT COUNT(*) FROM group_schedule').fetchone()[0] > 0"
+
   build_and_push:
     needs: lint
     if: github.event_name == 'push'
@@ -37,9 +54,8 @@ jobs:
       packages: write
 
     outputs:
-      backend_changed: ${{ steps.filter.outputs.backend }}
-      nginx_changed: ${{ steps.filter.outputs.nginx }}
       version: ${{ steps.version.outputs.version }}
+      image: ${{ steps.version.outputs.image }}
 
     steps:
       - name: Checkout
@@ -47,22 +63,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect changed paths
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            backend:
-              - 'app/**'
-              - 'Dockerfile'
-              - 'pyproject.toml'
-              - 'uv.lock'
-            nginx:
-              - 'nginx/**'
-
       - name: Calculate next version
-        if: steps.filter.outputs.backend == 'true'
         id: version
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           git fetch --tags
 
@@ -76,9 +80,9 @@ jobs:
           fi
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "image=${REGISTRY}/${REPOSITORY_OWNER,,}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
-        if: steps.filter.outputs.backend == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -86,24 +90,21 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        if: steps.filter.outputs.backend == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push backend image
-        if: steps.filter.outputs.backend == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+            ${{ steps.version.outputs.image }}:${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.image }}:latest
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
       - name: Create git tag
-        if: steps.filter.outputs.backend == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -132,33 +133,25 @@ jobs:
           script: |
             set -e
 
-            cd ${{ secrets.VPS_PROJECT_PATH }}
+            cd "${{ secrets.VPS_PROJECT_PATH }}"
 
             git fetch origin main
-            git reset --hard origin/main
+            git reset --hard "${{ github.sha }}"
 
-            if [ "${{ needs.build_and_push.outputs.backend_changed }}" = "true" ]; then
-              echo "==> Backend changed"
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u "${{ github.actor }}" \
+              --password-stdin
 
-              echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
-                -u "${{ github.actor }}" \
-                --password-stdin
+            export IMAGE_TAG=${{ needs.build_and_push.outputs.version }}
+            export BACKEND_IMAGE=${{ needs.build_and_push.outputs.image }}
 
-              export IMAGE_TAG=${{ needs.build_and_push.outputs.version }}
+            docker compose -f docker-compose.prod.yml pull app
+            # Entrypoint applies the ready schedule before starting the API.
+            docker compose -f docker-compose.prod.yml up -d --no-deps --wait --wait-timeout 120 app
+            printf 'BACKEND_IMAGE=%s\nIMAGE_TAG=%s\n' "$BACKEND_IMAGE" "$IMAGE_TAG" > .deploy-image.env
 
-              docker compose -f docker-compose.prod.yml pull app
-              docker compose -f docker-compose.prod.yml up -d --no-deps app
-            else
-              echo "==> Backend unchanged"
-            fi
-
-            if [ "${{ needs.build_and_push.outputs.nginx_changed }}" = "true" ]; then
-              echo "==> Reload nginx"
-
-              docker exec vsuet_rating_v2-nginx nginx -t
-              docker exec vsuet_rating_v2-nginx nginx -s reload
-            else
-              echo "==> nginx unchanged"
-            fi
+            # nginx must resolve the address of the recreated app container.
+            docker exec vsuet_rating_v2-nginx nginx -t
+            docker exec vsuet_rating_v2-nginx nginx -s reload
 
             docker image prune -f

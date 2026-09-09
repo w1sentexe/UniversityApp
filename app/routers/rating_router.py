@@ -6,7 +6,7 @@ from app.services.rating_service import RatingService, get_rating_service
 router = APIRouter(prefix="/rating", tags=["rating"])
 
 # Зачёт и экзамен возвращают записи обеих форм: ведомость без колонок КТ парсер
-# относит к оценочному формату независимо от вида (см. app/parser/html_parser.py).
+# относит к оценочному формату независимо от вида (см. app/services/parser_service.py).
 
 
 @router.get("/{zach_number}/zachet")

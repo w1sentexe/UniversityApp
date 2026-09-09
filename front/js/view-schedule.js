@@ -9,13 +9,15 @@
  */
 
 import { $, escapeHtml, plural, sealSvg } from "./utils.js";
-import { getGroup } from "./store.js";
-import { DAYS, LESSON_TYPES, hasSubgroups, lessonCount, lessonsFor, loadSchedule } from "./data/schedule.js";
+import { SUBGROUPS } from "./config.js";
+import { getGroup, getSubgroup, setSubgroup } from "./store.js";
+import { DAYS, LESSON_TYPES, formatTime, hasSubgroups, lessonCount, lessonsFor, loadSchedule } from "./data/schedule.js";
 
 let schedWeek = "numerator";
 let schedDay = null;
 // 0 — показывать всё без деления; 1 или 2 — только своя подгруппа.
-let schedSubgroup = 0;
+// Свою подгруппу студент выбирает один раз, поэтому она переживает перезагрузку.
+let schedSubgroup = getSubgroup();
 
 function currentDayKey() {
   const js = new Date().getDay(); // 0=вс … 6=сб
@@ -104,6 +106,7 @@ export async function renderSchedule() {
   el.querySelectorAll("[data-subgroup]").forEach((b) =>
     b.addEventListener("click", () => {
       schedSubgroup = Number(b.dataset.subgroup);
+      setSubgroup(schedSubgroup);
       renderSchedule();
     }),
   );
@@ -115,13 +118,13 @@ export async function renderSchedule() {
  */
 function subgroupPicker(schedule) {
   if (!hasSubgroups(schedule)) return "";
-  const option = (value, label) =>
+  const option = ({ value, label }) =>
     `<button class="seg__btn ${schedSubgroup === value ? "is-active" : ""}" type="button" data-subgroup="${value}">${label}</button>`;
   return `
     <div class="sched__pick">
       <span class="sched__pick-label" id="subgroup-label">Подгруппа</span>
       <div class="seg seg--compact" role="group" aria-labelledby="subgroup-label">
-        ${option(0, "Все")}${option(1, "1")}${option(2, "2")}
+        ${SUBGROUPS.map(option).join("")}
       </div>
     </div>`;
 }
@@ -157,24 +160,29 @@ function lessonCard(lesson) {
 
   // Подгруппу показываем, только когда занятие идёт не всей группе:
   // [1, 2] означает «все», и уточнять там нечего.
-  const split = Array.isArray(lesson.subgroup) && lesson.subgroup.length === 1;
+  const split = Array.isArray(lesson.subgroups) && lesson.subgroups.length === 1;
 
-  return `<article class="sched-card" data-type="${escapeHtml(lesson.type)}">
-    <div class="sched-card__time">${escapeHtml(lesson.start)}<span>${escapeHtml(lesson.endTime || "")}</span></div>
+  return `<article class="sched-card" data-type="${escapeHtml(lesson.lesson_type)}">
+    <div class="sched-card__time">${escapeHtml(formatTime(lesson.start_time))}<span>${escapeHtml(formatTime(lesson.end_time))}</span></div>
     <div class="sched-card__body">
       <div class="sched-card__name">${escapeHtml(lesson.name)}</div>
       <dl class="sched-card__meta">
         ${row("Ауд.", lesson.classroom, true)}
-        ${row("Преподаватель", lesson.teacherName)}
-        ${split ? row("№ подгруппы", String(lesson.subgroup[0]), true) : ""}
+        ${row("Преподаватель", lesson.teacher_name)}
+        ${split ? row("№ подгруппы", String(lesson.subgroups[0]), true) : ""}
       </dl>
     </div>
-    <span class="sched-card__badge">${LESSON_TYPES[lesson.type] || "Занятие"}</span>
+    <span class="sched-card__badge">${LESSON_TYPES[lesson.lesson_type] || "Занятие"}</span>
   </article>`;
 }
 
-/** Сброс при новом входе: текущий день и показ без фильтра по подгруппе. */
+/**
+ * Сброс при новом входе: день — текущий, подгруппа — из запомненного выбора.
+ *
+ * Выбор запомнен по зачётке, поэтому свою подгруппу студент переносит через
+ * перезагрузку и «Выход», а другой студент начинает с «Все».
+ */
 export function resetSchedule() {
   schedDay = null;
-  schedSubgroup = 0;
+  schedSubgroup = getSubgroup();
 }

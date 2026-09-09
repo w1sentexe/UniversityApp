@@ -6,7 +6,7 @@
  * session.js, получилось бы кольцо импортов: session → nav → settings → session.
  */
 
-import { DEFAULT_START_TAB, START_TABS, STORAGE_KEYS } from "./config.js";
+import { DEFAULT_START_TAB, DEFAULT_SUBGROUP, START_TABS, STORAGE_KEYS, SUBGROUPS } from "./config.js";
 
 let currentZach = "";
 // Группа приходит с бека отдельным запросом и живёт только в памяти:
@@ -74,6 +74,41 @@ export function getStartTab() {
 export function setStartTab(name) {
   try {
     localStorage.setItem(STORAGE_KEYS.startTab, name);
+  } catch (_) {
+    /* приватный режим — выбор не запомнится */
+  }
+}
+
+/**
+ * Подгруппа, выбранная в расписании: 0 — показывать всё, 1 или 2 — свою.
+ *
+ * Ключ у каждой зачётки свой. Подгруппа — свойство самого студента, а не
+ * сессии: она не меняется весь семестр, поэтому переживает и перезагрузку, и
+ * «Выход». Общий ключ на всё приложение достался бы после «Выхода» следующему
+ * студенту, а у него подгруппа своя.
+ */
+function subgroupKey() {
+  return `${STORAGE_KEYS.subgroup}:${currentZach}`;
+}
+
+/**
+ * Читается с проверкой по списку — как и стартовый раздел: в localStorage
+ * могло остаться что угодно, а неизвестный номер отфильтровал бы все пары.
+ */
+export function getSubgroup() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(subgroupKey());
+  } catch (_) {
+    /* приватный режим — показываем расписание целиком */
+  }
+  const value = Number(saved);
+  return SUBGROUPS.some((item) => item.value === value) ? value : DEFAULT_SUBGROUP;
+}
+
+export function setSubgroup(value) {
+  try {
+    localStorage.setItem(subgroupKey(), String(value));
   } catch (_) {
     /* приватный режим — выбор не запомнится */
   }

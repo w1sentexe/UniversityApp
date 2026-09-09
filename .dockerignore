@@ -6,3 +6,9 @@ __pycache__/
 for_agent/
 legacy_parsers/
 *.log
+data/
+*.sqlite3*
+.agents/
+.codex/
+.ruff_cache/
+.deploy-image.env

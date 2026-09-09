@@ -50,7 +50,7 @@ class GroupExtractor:
     def feed(self, group_name: str, records: Sequence[VedRecord]) -> None:
         """Скармливает записи одной ведомости, зная её группу.
 
-        На вход идут ровно те модели, что вернул parse_ved_html.
+        На вход идут ровно те модели, что вернул ParserService.parse_ved.
         """
         if not group_name:
             return

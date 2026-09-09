@@ -4,8 +4,8 @@
     python -m tools.schedule_import --dry-run    # разобрать и показать отчёт
     python -m tools.schedule_import путь.xlsx    # один файл или своя папка
 
-Инструмент запускается руками раз в семестр, поэтому и живёт вне app: бэкенд о
-нём ничего не знает и работает без него. Обратная зависимость есть — писать в
+Инструмент запускается вручную или при сборке Docker-образа и живёт вне app.
+Обратная зависимость есть — писать в
 таблицу через тот же репозиторий, что и читает API, надёжнее, чем повторять
 здесь SQL.
 
@@ -63,6 +63,11 @@ def main() -> None:
         help=f"файл или папка с выгрузками; по умолчанию {DEFAULT_SOURCE.name}/ рядом с инструментом",
     )
     parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="отменить импорт при пропущенных файлах, пустых выгрузках или повторяющихся группах",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="только разобрать и показать отчёт, в БД ничего не писать",
@@ -81,6 +86,13 @@ def main() -> None:
         raise SystemExit(1) from exc
 
     _print_report(reports, len(schedules))
+
+    if args.strict and (
+        any(not report.ok or not report.groups or not report.lessons for report in reports)
+        or sum(report.groups for report in reports) != len(schedules)
+    ):
+        print("\n  Неполное или неоднозначное расписание, запись отменена", file=sys.stderr)
+        raise SystemExit(1)
 
     if args.dry_run:
         print("\n  --dry-run: в БД ничего не записано")

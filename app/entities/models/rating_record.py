@@ -9,7 +9,7 @@ class RatingRecord(Base):
 
     Отдельная таблица от GradeRecord, а не общая с nullable-колонками: форму
     записи выбирает не вид ведомости, а наличие колонок КТ в источнике
-    (см. is_rating в app/parser/html_parser.py), поэтому зачёт может оказаться
+    (см. is_rating в app/services/parser_service.py), поэтому зачёт может оказаться
     и здесь, и там.
 
     control_points хранится одним JSON-полем, а не отдельной таблицей.
