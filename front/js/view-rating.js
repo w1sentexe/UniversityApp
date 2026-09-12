@@ -9,6 +9,16 @@
 import { DASH, VED_TYPES } from "./config.js";
 import { apiGet } from "./api.js";
 import {
+  RATING_REFRESH_COOLDOWN_MS,
+  cacheHasVersion,
+  mergeRatingCache,
+  readRatingCache,
+  sectionsFromCache,
+  typesNeedingRefresh,
+  writeRatingCache,
+} from "./data/rating-cache.js";
+import { loadSnapshotStatus, snapshotVersion } from "./data/snapshot-status.js";
+import {
   $,
   disciplines,
   escapeHtml,
@@ -20,6 +30,7 @@ import {
 } from "./utils.js";
 
 const ratingContent = $("#rating-content");
+const lastRefreshByZach = new Map();
 
 function numericValue(value) {
   if (isBlank(value)) return null;
@@ -55,36 +66,78 @@ function renderState(kind, title, text, retry) {
   if (retry) $("#state-retry").addEventListener("click", retry);
 }
 
-export async function loadRating(zach) {
-  renderState("loading", "Открываем зачётную книжку", `№ ${zach} · собираем ведомости…`);
+export async function loadRating(zach, { force = false, reloadSections = false } = {}) {
+  let cache = readRatingCache(zach);
+  if (cache) {
+    renderRating(zach, cache, { failedTypes: [] });
+  } else {
+    renderState("loading", "Открываем зачётную книжку", `№ ${zach} · собираем ведомости…`);
+  }
 
-  const results = await Promise.allSettled(
-    VED_TYPES.map((t) => apiGet(`/rating/${encodeURIComponent(zach)}/${t.segment}`))
-  );
+  const now = Date.now();
+  const lastRefresh = lastRefreshByZach.get(zach) || 0;
+  if (!force && cache && now - lastRefresh < RATING_REFRESH_COOLDOWN_MS) return;
+  lastRefreshByZach.set(zach, now);
 
-  const sections = [];
-  let failed = 0;
-  results.forEach((res, i) => {
-    if (res.status === "fulfilled") {
-      const records = Array.isArray(res.value) ? res.value : [];
-      if (records.length) sections.push({ type: VED_TYPES[i], records });
-    } else { failed += 1; }
-  });
-
-  if (failed === VED_TYPES.length) {
-    renderState("error", "Не удалось загрузить данные", "Сервер недоступен или вернул ошибку.", () => loadRating(zach));
+  let status;
+  try {
+    status = await loadSnapshotStatus({ force });
+  } catch (_) {
+    if (!cache) {
+      renderState("error", "Не удалось загрузить данные", "Сервер недоступен или вернул ошибку.", () =>
+        loadRating(zach, { force: true, reloadSections: true }),
+      );
+    }
     return;
   }
+
+  const version = snapshotVersion(status);
+  if (!reloadSections && cacheHasVersion(cache, version, VED_TYPES)) return;
+
+  const types = reloadSections ? VED_TYPES : typesNeedingRefresh(cache, version, VED_TYPES);
+  const results = await Promise.allSettled(
+    types.map((t) => apiGet(`/rating/${encodeURIComponent(zach)}/${t.segment}`)),
+  );
+
+  const updates = [];
+  const failedTypes = [];
+  results.forEach((res, i) => {
+    const type = types[i];
+    if (res.status === "fulfilled") {
+      const records = Array.isArray(res.value) ? res.value : [];
+      updates.push({ type, records });
+    } else {
+      failedTypes.push(type);
+    }
+  });
+
+  if (updates.length > 0) {
+    cache = mergeRatingCache(cache, updates, version);
+    writeRatingCache(zach, cache);
+  }
+
+  if (!cache && failedTypes.length === types.length) {
+    renderState("error", "Не удалось загрузить данные", "Сервер недоступен или вернул ошибку.", () =>
+      loadRating(zach, { force: true, reloadSections: true }),
+    );
+    return;
+  }
+
+  renderRating(zach, cache, { failedTypes });
+}
+
+function renderRating(zach, cache, { failedTypes }) {
+  const sections = sectionsFromCache(cache, VED_TYPES);
   if (sections.length === 0) {
     renderState("empty", "Ведомостей пока нет", `По зачётной книжке № ${zach} данные об успеваемости отсутствуют.`);
     return;
   }
 
   let html = "";
-  if (failed > 0) {
+  if (failedTypes.length > 0) {
     html += `
       <div class="banner" role="status">
-        <span>Некоторые разделы не загрузились (${failed}).</span>
+        <span>Некоторые разделы не обновились (${failedTypes.length}).</span>
         <button class="btn btn--ghost banner__retry" type="button" id="banner-retry">Повторить</button>
       </div>`;
   }
@@ -92,7 +145,9 @@ export async function loadRating(zach) {
   ratingContent.innerHTML = html;
 
   const bannerRetry = $("#banner-retry");
-  if (bannerRetry) bannerRetry.addEventListener("click", () => loadRating(zach));
+  if (bannerRetry) {
+    bannerRetry.addEventListener("click", () => loadRating(zach, { force: true, reloadSections: true }));
+  }
 }
 
 function renderSection(section, index) {

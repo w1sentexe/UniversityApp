@@ -1,4 +1,4 @@
-const CACHE_NAME = "vsuet-rating-v54";
+const CACHE_NAME = "vsuet-rating-v55";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -24,7 +24,9 @@ const STATIC_ASSETS = [
   "./js/view-rating.js",
   "./js/view-settings.js",
   "./js/view-schedule.js",
+  "./js/data/rating-cache.js",
   "./js/data/schedule.js",
+  "./js/data/snapshot-status.js",
   "./js/kt-popup.js",
   "./js/sw-register.js",
   "./resources/logo.svg",

@@ -11,6 +11,7 @@ from app.config import settings
 from app.logging_config import get_logger, print_banner, setup_logging
 from app.repository.notification_repository import NotificationRepository
 from app.repository.rating_repository import RatingRepository
+from app.repository.snapshot_meta_repository import SnapshotMetaRepository
 from app.repository.snapshot_repository import SnapshotRepository
 from app.routers import notifications_router, rating_router, schedule_router, students_router
 from app.services.notification_service import NotificationService
@@ -48,9 +49,10 @@ async def run_parsing_cycle() -> None:
             snapshot = SnapshotRepository(session)
             reader = RatingRepository(session)
             notifications = NotificationRepository(session)
+            metadata = SnapshotMetaRepository(session)
             try:
                 async with ParserService() as parser:
-                    report = await ParsingPipeline(parser, snapshot, reader, notifications).run()
+                    report = await ParsingPipeline(parser, snapshot, reader, notifications, metadata).run()
             except PipelineError as exc:
                 # Пайплайн уже откатил транзакцию — в БД остался прежний снапшот.
                 log.exception("Parsing cycle failed, snapshot not committed", stage=exc.stage)

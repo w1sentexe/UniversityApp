@@ -9,7 +9,9 @@ from app.entities.schemas.notification import (
     RatingMutationResponse,
 )
 from app.entities.schemas.rating import NotRatingVedModel, RatingVedModel, VedType
+from app.entities.schemas.snapshot import SnapshotStatusModel
 from app.repository.notification_repository import NotificationRepository
+from app.repository.snapshot_meta_repository import SnapshotMetaRepository
 from app.services.notification_service import NotificationService
 from app.services.rating_mutation_service import RatingMutationService
 from app.services.rating_service import RatingService, get_rating_service
@@ -19,6 +21,11 @@ router = APIRouter(prefix="/rating", tags=["rating"])
 
 # Зачёт и экзамен возвращают записи обеих форм: ведомость без колонок КТ парсер
 # относит к оценочному формату независимо от вида (см. app/services/parser_service.py).
+
+
+@router.get("/snapshot/status")
+async def snapshot_status(session: AsyncSession = Depends(get_session)) -> SnapshotStatusModel:
+    return await SnapshotMetaRepository(session).status()
 
 
 @router.get("/{zach_number}/zachet")

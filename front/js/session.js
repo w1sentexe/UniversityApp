@@ -7,8 +7,18 @@
 
 import { $ } from "./utils.js";
 import { apiGet } from "./api.js";
+import { loadSnapshotStatus, snapshotVersion } from "./data/snapshot-status.js";
 import { disableNotificationsForStoredSession } from "./notifications.js";
-import { clearZach, getStartTab, getZach, savedZach, setGroup, setZach } from "./store.js";
+import {
+  clearZach,
+  getCachedGroup,
+  getStartTab,
+  getZach,
+  savedZach,
+  setCachedGroup,
+  setGroup,
+  setZach,
+} from "./store.js";
 import { switchTab } from "./nav.js";
 import { clearRating, loadRating } from "./view-rating.js";
 import { focusZachInput, resetLoginForm } from "./login.js";
@@ -20,7 +30,7 @@ const viewLogin = $("#view-login");
 const viewApp = $("#view-app");
 const tabSchedule = $("#tab-schedule");
 const tabSettings = $("#tab-settings");
-const RETURN_REFRESH_COOLDOWN_MS = 3000;
+const RETURN_REFRESH_COOLDOWN_MS = 60000;
 
 let lastReturnRefreshAt = 0;
 
@@ -42,8 +52,8 @@ function refreshCurrentSession({ force = false } = {}) {
   if (!force && now - lastReturnRefreshAt < RETURN_REFRESH_COOLDOWN_MS) return;
   lastReturnRefreshAt = now;
 
-  loadRating(zach);
-  loadGroup(zach);
+  loadRating(zach, { force });
+  loadGroup(zach, { force });
 }
 
 function refreshWhenVisible({ force = false } = {}) {
@@ -58,13 +68,22 @@ function refreshWhenVisible({ force = false } = {}) {
  * пользователь туда зайдёт, значение уже на месте. Если настройки открыты прямо
  * сейчас (вход → сразу вкладка), перерисовываем их по приходу ответа.
  */
-async function loadGroup(zach) {
+async function loadGroup(zach, { force = false } = {}) {
+  const cached = getCachedGroup(zach);
+  if (cached) setGroup(cached.groupName || null);
+
   try {
-    const data = await apiGet(`/students/${encodeURIComponent(zach)}/group`);
-    setGroup(data && data.group_name ? data.group_name : null);
+    const status = await loadSnapshotStatus({ force });
+    const version = snapshotVersion(status);
+    if (!cached || cached.snapshotVersion !== version) {
+      const data = await apiGet(`/students/${encodeURIComponent(zach)}/group`);
+      const groupName = data && data.group_name ? data.group_name : null;
+      setGroup(groupName);
+      setCachedGroup(zach, groupName, version);
+    }
   } catch (_) {
-    // Сеть или бек недоступны — группа останется прочерком, рейтинг это не ломает.
-    setGroup(null);
+    // Сеть или бек недоступны — оставляем кешированную группу, если она была.
+    if (!cached) setGroup(null);
   }
   // Экраны, ждавшие группу, перерисовываем по приходу ответа.
   if (tabSettings && !tabSettings.hidden) renderSettings();

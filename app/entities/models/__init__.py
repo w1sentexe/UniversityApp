@@ -15,6 +15,7 @@ from app.entities.models.notification_outbox import NotificationOutbox
 from app.entities.models.push_subscription import PushSubscription
 from app.entities.models.rating_record import RatingRecord
 from app.entities.models.rating_watch_state import RatingWatchState
+from app.entities.models.snapshot_meta import SnapshotMeta
 from app.entities.models.student_group import StudentGroup
 
 # Таблицы снапшота рейтинга в порядке очистки перед заливкой нового цикла.
@@ -30,6 +31,7 @@ __all__ = [
     "PushSubscription",
     "RatingRecord",
     "RatingWatchState",
+    "SnapshotMeta",
     "StudentGroup",
     "utcnow",
 ]

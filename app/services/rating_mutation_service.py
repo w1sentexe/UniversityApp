@@ -12,6 +12,7 @@ from app.entities.schemas.notification import (
     RatingMutationResponse,
 )
 from app.repository.notification_repository import NotificationRepository
+from app.repository.snapshot_meta_repository import SnapshotMetaRepository
 
 
 class RatingMutationService:
@@ -44,6 +45,7 @@ class RatingMutationService:
             cycle_id=f"manual-{uuid4().hex}",
             zach_numbers=[request.zach_number],
         )
+        await SnapshotMetaRepository(self._session).mark_updated(source="manual")
         await self._session.commit()
         return RatingMutationResponse(
             zach_number=request.zach_number,
@@ -86,6 +88,7 @@ class RatingMutationService:
             cycle_id=f"manual-{uuid4().hex}",
             zach_numbers=[request.zach_number],
         )
+        await SnapshotMetaRepository(self._session).mark_updated(source="manual")
         await self._session.commit()
         return ControlPointMutationResponse(
             zach_number=request.zach_number,

@@ -37,6 +37,7 @@ from app.config import settings
 from app.logging_config import get_logger
 from app.repository.notification_repository import NotificationRepository
 from app.repository.rating_repository import RatingRepository
+from app.repository.snapshot_meta_repository import SnapshotMetaRepository
 from app.repository.snapshot_repository import SnapshotRepository
 from app.services.group_extractor import GroupExtractor
 from app.services.parser_service import ParserService
@@ -101,11 +102,13 @@ class ParsingPipeline:
         snapshot: SnapshotRepository,
         reader: RatingRepository,
         notifications: NotificationRepository | None = None,
+        metadata: SnapshotMetaRepository | None = None,
     ) -> None:
         self._parser = parser
         self._snapshot = snapshot
         self._reader = reader
         self._notifications = notifications
+        self._metadata = metadata
         self._stage_name = "initialization"
 
     @asynccontextmanager
@@ -162,19 +165,22 @@ class ParsingPipeline:
                 report.group_conflicts = group_stats["conflicts"]
                 report.skipped_blank = self._snapshot.skipped_rows
                 inserted = self._snapshot.rating_rows + self._snapshot.grade_rows
+                cycle_id = f"parse-{uuid4().hex}"
                 if self._notifications is not None:
                     report.queued_notifications = await self._notifications.enqueue_current_rating_changes(
-                        cycle_id=f"parse-{uuid4().hex}"
+                        cycle_id=cycle_id
                     )
-                await self._snapshot.commit()
-                opened = False
-                report.snapshot_committed = True
-                # Считаем строки уже после коммита: INSERT OR REPLACE схлопывает
+                # Считаем строки в той же транзакции: INSERT OR REPLACE схлопывает
                 # повторы по ключу, поэтому число вставок больше числа строк.
                 counts = await self._reader.counts()
                 report.rating_rows = counts["rating_record"]
                 report.grade_rows = counts["grade_record"]
                 report.duplicate_keys = inserted - report.rating_rows - report.grade_rows
+                if self._metadata is not None:
+                    await self._metadata.mark_updated(source="parse", version=cycle_id)
+                await self._snapshot.commit()
+                opened = False
+                report.snapshot_committed = True
                 r["rating_rows"] = report.rating_rows
                 r["grade_rows"] = report.grade_rows
                 r["group_rows"] = counts["student_group"]

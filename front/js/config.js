@@ -37,6 +37,7 @@ export const STORAGE_KEYS = {
   zach: "rating:lastZach",
   theme: "rating:theme",
   startTab: "rating:startTab",
+  group: "rating:group",
   // К ключу дописывается номер зачётки: подгруппа у каждого студента своя.
   subgroup: "rating:subgroup",
 };

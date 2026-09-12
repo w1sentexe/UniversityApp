@@ -26,6 +26,34 @@ export function setGroup(groupName) {
   currentGroup = groupName;
 }
 
+function groupKey(zach) {
+  return `${STORAGE_KEYS.group}:${zach}`;
+}
+
+export function getCachedGroup(zach) {
+  try {
+    const raw = localStorage.getItem(groupKey(zach));
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+export function setCachedGroup(zach, groupName, snapshotVersion) {
+  try {
+    localStorage.setItem(
+      groupKey(zach),
+      JSON.stringify({
+        groupName,
+        snapshotVersion,
+        savedAt: Date.now(),
+      }),
+    );
+  } catch (_) {
+    /* приватный режим — группа останется только в памяти */
+  }
+}
+
 /** Запоминает номер и в памяти, и на диске: сессия должна пережить перезагрузку. */
 export function setZach(zach) {
   currentZach = zach;
