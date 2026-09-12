@@ -18,6 +18,7 @@ export const VED_TYPES = [
   { segment: "kursovaya-rabota",   title: "Курсовая работа",    kind: "grade"  },
   { segment: "kursovoy-proekt",    title: "Курсовой проект",    kind: "grade"  },
   { segment: "praktika",           title: "Практика",           kind: "grade"  },
+  { segment: "referat",            title: "Реферат",            kind: "grade"  },
 ];
 
 /** Виды работ внутри контрольной точки — колонки попапа детализации. */

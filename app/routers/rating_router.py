@@ -93,6 +93,15 @@ async def praktika(
     return result
 
 
+@router.get("/{zach_number}/referat")
+async def referat(
+    zach_number: str,
+    rating_service: RatingService = Depends(get_rating_service),
+) -> list[NotRatingVedModel]:
+    result = await rating_service.get_by_ved_type(zach_number, VedType.REFERAT)
+    return result
+
+
 @router.patch("/test/final-rating")
 async def update_final_rating_for_test(
     request: RatingMutationRequest,

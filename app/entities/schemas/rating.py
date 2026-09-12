@@ -20,6 +20,7 @@ class VedType(str, Enum):
     KURSOVAYA_RABOTA = "Курсовая работа"
     KURSOVOY_PROEKT = "Курсовой проект"
     PRAKTIKA = "Практика"
+    REFERAT = "Реферат"
 
 
 RATING_VED_TYPES: frozenset[VedType] = frozenset(
@@ -46,7 +47,7 @@ class Grade(str, Enum):
 class NotRatingVedModel(BaseModel):
     zach_number: str
     subject_name: str
-    ved_type: VedType
+    ved_type: VedType | str
     grade: Grade | str = "-"  # т.к может прийти -
 
 
@@ -67,6 +68,6 @@ class ControlPoint(BaseModel):
 class RatingVedModel(BaseModel):
     zach_number: str
     subject_name: str
-    ved_type: VedType
+    ved_type: VedType | str
     control_points: list[ControlPoint] = []
     final_rating: int | str = "-"
