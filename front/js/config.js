@@ -42,7 +42,7 @@ export const STORAGE_KEYS = {
   subgroup: "rating:subgroup",
 };
 
-/** Фильтр расписания по подгруппе: 0 — без фильтра, дальше номер подгруппы. */
+/** Выбор подгруппы в настройках: 0 — без фильтра, дальше номер подгруппы. */
 export const SUBGROUPS = [
   { value: 0, label: "Все" },
   { value: 1, label: "1" },

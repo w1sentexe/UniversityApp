@@ -1,13 +1,13 @@
 /**
- * Экран настроек: карточка профиля, выбор темы и стартового раздела.
+ * Экран настроек: профиль, оформление и личные параметры расписания.
  *
  * Перерисовывается целиком при каждом открытии вкладки и после смены настройки —
  * состояния тут нет, всё берётся из store и theme.
  */
 
-import { START_TABS } from "./config.js";
+import { START_TABS, SUBGROUPS } from "./config.js";
 import { $, escapeHtml } from "./utils.js";
-import { getGroup, getStartTab, getZach, setStartTab } from "./store.js";
+import { getGroup, getStartTab, getSubgroup, getZach, setStartTab, setSubgroup } from "./store.js";
 import {
   disableNotifications,
   enableNotifications,
@@ -30,6 +30,7 @@ export function renderSettings() {
   const el = $("#settings-content");
   const theme = currentTheme();
   const startTab = getStartTab();
+  const subgroup = getSubgroup();
 
   el.innerHTML = `
     <div class="settings">
@@ -71,6 +72,18 @@ export function renderSettings() {
         </div>
       </div>
       <div class="set-card">
+        <p class="set-card__label">Расписание</p>
+        <div class="set-row set-row--control">
+          <span class="set-row__k">Моя подгруппа</span>
+          <div class="seg" role="group" aria-label="Моя подгруппа">
+            ${SUBGROUPS.map(
+              (item) =>
+                `<button class="seg__btn ${item.value === subgroup ? "is-active" : ""}" type="button" data-set-subgroup="${item.value}">${item.label}</button>`,
+            ).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="set-card">
         <p class="set-card__label">Уведомления</p>
         <div class="set-row set-row--control">
           <span class="set-row__k">Новый рейтинг</span>
@@ -95,6 +108,13 @@ export function renderSettings() {
   el.querySelectorAll("[data-set-start]").forEach((b) =>
     b.addEventListener("click", () => {
       setStartTab(b.dataset.setStart);
+      renderSettings();
+    }),
+  );
+
+  el.querySelectorAll("[data-set-subgroup]").forEach((b) =>
+    b.addEventListener("click", () => {
+      setSubgroup(Number(b.dataset.setSubgroup));
       renderSettings();
     }),
   );

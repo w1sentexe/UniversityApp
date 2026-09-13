@@ -9,14 +9,13 @@
  */
 
 import { $, escapeHtml, plural, sealSvg } from "./utils.js";
-import { SUBGROUPS } from "./config.js";
-import { getGroup, getSubgroup, setSubgroup } from "./store.js";
-import { DAYS, LESSON_TYPES, formatTime, hasSubgroups, lessonCount, lessonsFor, loadSchedule } from "./data/schedule.js";
+import { getGroup, getSubgroup } from "./store.js";
+import { DAYS, LESSON_TYPES, formatTime, lessonCount, lessonsFor, loadSchedule } from "./data/schedule.js";
 
 let schedWeek = "numerator";
 let schedDay = null;
 // 0 — показывать всё без деления; 1 или 2 — только своя подгруппа.
-// Свою подгруппу студент выбирает один раз, поэтому она переживает перезагрузку.
+// Выбор живёт в настройках и переживает перезагрузку.
 let schedSubgroup = getSubgroup();
 
 function currentDayKey() {
@@ -37,6 +36,8 @@ function renderState(title, text, retry) {
 }
 
 export async function renderSchedule() {
+  // Настройка могла поменяться после прошлого открытия вкладки.
+  schedSubgroup = getSubgroup();
   const group = getGroup();
 
   // Группа приходит отдельным запросом на входе; без неё расписание не за что зацепить.
@@ -72,7 +73,6 @@ export async function renderSchedule() {
           <button class="seg__btn ${schedWeek === "numerator" ? "is-active" : ""}" type="button" data-week="numerator">Числитель</button>
           <button class="seg__btn ${schedWeek === "denominator" ? "is-active" : ""}" type="button" data-week="denominator">Знаменатель</button>
         </div>
-        ${subgroupPicker(schedule)}
       </div>
       <div class="days" role="tablist" aria-label="День недели">
         ${DAYS.map((day) => {
@@ -103,30 +103,6 @@ export async function renderSchedule() {
       renderSchedDay(schedule);
     }),
   );
-  el.querySelectorAll("[data-subgroup]").forEach((b) =>
-    b.addEventListener("click", () => {
-      schedSubgroup = Number(b.dataset.subgroup);
-      setSubgroup(schedSubgroup);
-      renderSchedule();
-    }),
-  );
-}
-
-/**
- * Селект подгруппы. По умолчанию «Все» — расписание показывается целиком,
- * как будто деления нет. Для групп без подгрупп не рисуется вовсе.
- */
-function subgroupPicker(schedule) {
-  if (!hasSubgroups(schedule)) return "";
-  const option = ({ value, label }) =>
-    `<button class="seg__btn ${schedSubgroup === value ? "is-active" : ""}" type="button" data-subgroup="${value}">${label}</button>`;
-  return `
-    <div class="sched__pick">
-      <span class="sched__pick-label" id="subgroup-label">Подгруппа</span>
-      <div class="seg seg--compact" role="group" aria-labelledby="subgroup-label">
-        ${SUBGROUPS.map(option).join("")}
-      </div>
-    </div>`;
 }
 
 function renderSchedDay(schedule) {
