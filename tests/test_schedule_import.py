@@ -5,7 +5,6 @@ from pathlib import Path
 
 from tools.schedule_import.parser import parse_schedule
 
-
 SOURCE = Path(__file__).parents[1] / "tools" / "schedule_import" / "files"
 
 
