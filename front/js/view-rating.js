@@ -25,6 +25,7 @@ import {
   gradeClass,
   isBlank,
   isRatingRecord,
+  isZeroWeight,
   sealSvg,
   showNum,
 } from "./utils.js";
@@ -50,7 +51,10 @@ function calculatedFinalRating(record) {
 }
 
 function hasControlPointDetails(point) {
-  return Object.keys(WORK_LABELS).some((key) => !isBlank(point?.[key]?.weight));
+  return Object.keys(WORK_LABELS).some((key) => {
+    const weight = point?.[key]?.weight;
+    return !isBlank(weight) && !isZeroWeight(weight);
+  });
 }
 
 /** Очистка при выходе из зачётки. */

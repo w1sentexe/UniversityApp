@@ -11,7 +11,7 @@
  */
 
 import { DASH, WORK_LABELS } from "./config.js";
-import { escapeHtml, isBlank, showNum } from "./utils.js";
+import { escapeHtml, isBlank, isZeroWeight, showNum } from "./utils.js";
 
 const popupEl = document.createElement("div");
 popupEl.id = "kt-popup";
@@ -47,7 +47,7 @@ function openKtPopup(subject, ktNum, cp) {
     .filter(([key]) => {
       const w = cp[key];
       if (!w) return false;
-      return !isBlank(w.weight);
+      return !isBlank(w.weight) && !isZeroWeight(w.weight);
     })
     .map(([key, label]) => {
       const w = cp[key];

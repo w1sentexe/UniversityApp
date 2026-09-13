@@ -32,6 +32,10 @@ export function isBlank(v) {
   return v === null || v === undefined || v === "-" || v === "";
 }
 
+export function isZeroWeight(v) {
+  return v === 0 || v === "0" || v === 0.0;
+}
+
 /** Значение для ячейки таблицы: прочерк вместо пустоты, остальное экранируем. */
 export function showNum(v) {
   return isBlank(v) ? DASH : escapeHtml(v);
