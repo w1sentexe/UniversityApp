@@ -80,11 +80,11 @@ _WEEKS = ("numerator", "denominator")
 # «08.00-09.35»; разделитель часов и минут в выгрузке точка, но точку с
 # двоеточием не различаем — от источника к источнику написание плавает.
 _SLOT_TIME = re.compile(r"(\d{1,2})[.:](\d{2})\s*-\s*(\d{1,2})[.:](\d{2})")
-# «Мирошниченко Е.Н.   21» — фамилия с инициалами, затем через отступ аудитория.
-# Аудитория необязательна и может быть с буквой: 309б, 11и, 020.
-_TEACHER_ROOM = re.compile(r"([А-ЯЁA-Z][^\s]*(?:\s+[А-ЯЁA-Z]\.){0,2}[^\s]*)\s{2,}(\S+)")
-# Разделитель двух пар «преподаватель + аудитория» внутри одной ячейки.
-_PAIR_SPLIT = re.compile(r"\s{4,}")
+# «Мирошниченко Е.Н.   21» — фамилия с инициалами, затем аудитория.
+# У второго преподавателя в ячейке тот же шаблон, поэтому ищем именно полные
+# пары, а не режем строку по длинному отступу: в выгрузках встречается
+# «Козыренко Е.В,    11и» и служебная метка «Z» после аудитории.
+_TEACHER_ROOM = re.compile(r"(?P<teacher>[А-ЯЁA-Z][А-Яа-яЁёA-Za-z-]*(?:\s+[А-ЯЁA-Z]\.){1,2})[,.]?\s+(?P<room>\S+)")
 
 # Расписание группы, пока оно собирается: недели → дни → занятия. В
 # ScheduleModel накопитель превращается на выходе, когда все листы прочитаны.
@@ -200,14 +200,7 @@ def _split_teacher_room(text: str) -> list[tuple[str | None, str | None]]:
     прямо внутри объединённой ячейки. Аудитории в источнике бывает не указано,
     поэтому вторая половина пары необязательна.
     """
-    chunks = [c.strip() for c in _PAIR_SPLIT.split(text.strip()) if c.strip()]
-    pairs: list[tuple[str | None, str | None]] = []
-    for chunk in chunks:
-        match = _TEACHER_ROOM.match(chunk)
-        if match:
-            pairs.append((match.group(1).strip(), match.group(2).strip()))
-        else:
-            pairs.append((chunk, None))
+    pairs = [(match["teacher"].strip(), match["room"].strip()) for match in _TEACHER_ROOM.finditer(text)]
     return pairs or [(text.strip(), None)]
 
 
@@ -359,31 +352,47 @@ def _lessons_at(
     end_time: time,
 ) -> list[LessonModel]:
     """Занятия одной группы в конкретной строке (числитель или знаменатель)."""
-    # Собираем значения по колонкам группы, схлопывая одинаковые: объединённая
-    # на обе подгруппы ячейка даёт одно и то же значение в каждой колонке.
-    seen: list[tuple[Any, int]] = []
+    # Собираем именно ячейки, а не только их текст: две одинаково заполненные
+    # соседние ячейки всё равно могут относиться к разным подгруппам. У
+    # объединённой ячейки значение лежит в якоре, поэтому она попадёт сюда раз.
+    seen: list[tuple[Any, int, int]] = []
+    seen_anchors: set[tuple[int, int]] = set()
     for col in range(first_col, first_col + width):
-        value, _ = _cell_value(sheet, merged, row, col)
+        value, merge_width = _cell_value(sheet, merged, row, col)
         if value is None or not str(value).strip():
             continue
-        if not seen or seen[-1][0] != value:
-            seen.append((value, col))
+        anchor_row, anchor_col, _ = merged.get((row, col), (row, col, 1))
+        if (anchor_row, anchor_col) in seen_anchors:
+            continue
+        seen_anchors.add((anchor_row, anchor_col))
+        seen.append((value, anchor_col, merge_width))
 
     lessons: list[LessonModel] = []
-    for value, col in seen:
+    for value, cell_col, cell_width in seen:
         parsed = _parse_cell(value)
         if parsed is None:
             continue
         lesson_type, name, occupants = parsed
+
+        # Группа в шапке занимает две колонки. Объединение на обе означает
+        # общее занятие, а одиночная ячейка — занятие только своей подгруппы.
+        # У одноколоночной группы разделение может быть записано двумя
+        # преподавателями внутри одной ячейки, поэтому базово она общая.
+        if width == 1:
+            cell_subgroups = [1, 2]
+        else:
+            covered_first = max(first_col, cell_col)
+            covered_last = min(first_col + width - 1, cell_col + cell_width - 1)
+            cell_subgroups = list(range(covered_first - first_col + 1, covered_last - first_col + 2))
+
         for index, (teacher, room) in enumerate(occupants):
-            # Подгруппа определяется либо позицией колонки внутри группы,
-            # либо порядком пары «преподаватель + аудитория» в общей ячейке.
-            if len(occupants) > 1:
+            # Две валидные пары в общей ячейке идут в порядке подгрупп. Если
+            # ячейка уже ограничена одной колонкой, она относится к этой
+            # подгруппе независимо от количества текстовых фрагментов.
+            if len(occupants) == len(cell_subgroups) and len(cell_subgroups) > 1:
                 subgroups = [index + 1]
-            elif len(seen) > 1:
-                subgroups = [col - first_col + 1]
             else:
-                subgroups = [1, 2]
+                subgroups = cell_subgroups
             lessons.append(
                 LessonModel(
                     start_time=start_time,
