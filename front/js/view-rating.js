@@ -6,7 +6,7 @@
  * Детализацию контрольной точки открывает js/kt-popup.js по клику на ячейку.
  */
 
-import { DASH, VED_TYPES } from "./config.js";
+import { DASH, VED_TYPES, WORK_LABELS } from "./config.js";
 import { apiGet } from "./api.js";
 import {
   RATING_REFRESH_COOLDOWN_MS,
@@ -47,6 +47,10 @@ function calculatedFinalRating(record) {
 
   const average = totals.reduce((sum, value) => sum + value, 0) / totals.length;
   return Number.isInteger(average) ? String(average) : String(Number(average.toFixed(2)));
+}
+
+function hasControlPointDetails(point) {
+  return Object.keys(WORK_LABELS).some((key) => !isBlank(point?.[key]?.weight));
 }
 
 /** Очистка при выходе из зачётки. */
@@ -184,9 +188,9 @@ function renderRatingTable(records) {
     for (let k = 0; k < maxKt; k++) {
       const cp = cps[k];
       const total = cp ? showNum(cp.total) : DASH;
-      const hasData = cp && !isBlank(cp.total);
+      const hasDetails = cp && hasControlPointDetails(cp);
 
-      if (hasData) {
+      if (hasDetails) {
         const cpJson = escapeHtml(JSON.stringify(cp));
         row += `<td class="rt-total rt-total--clickable"
                     data-cp="${cpJson}"
